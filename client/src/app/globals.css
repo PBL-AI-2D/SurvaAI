@@ -1,0 +1,146 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-primary-1: #2A6FDB;
+  --color-primary-2: #4C8EE2;
+  --color-primary-3: #A8C8F4;
+
+  --color-secondary-1: #FFC86F;
+  --color-secondary-2: #FFE4B2;
+
+  --color-accent-1: #FFFFFF;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --glass-bg: var(--glass-background);
+  --glass-border: var(--glass-border);
+  --glass-shadow: var(--glass-shadow);
+  --glass-blur: var(--glass-blur);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* 🌞 Light mode (tuned) */
+  --background: #EDF4FA;
+  --foreground: #102A43;
+
+  --primary: #2A6FDB;
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #FFC86F;
+  --secondary-foreground: #1C1C1C;
+
+  --accent: #FFE4B2;
+  --accent-foreground: #1C1C1C;
+
+  --muted: #F3F6FA;
+  --muted-foreground: #486581;
+
+  --border: #D9E2EC;
+  --input: #E5E7EB;
+  --ring: #4C8EE2;
+  --destructive: #D14343;
+
+  --card: #FFFFFF;
+  --card-foreground: #1C1C1C;
+  --popover: #FFFFFF;
+  --popover-foreground: #1C1C1C;
+
+  --glass-background: rgba(255, 255, 255, 0.5);
+  --glass-border: rgba(0, 0, 0, 0.05);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --glass-blur: blur(12px);
+
+  --spotlight-fade: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 0) 40%,
+    rgba(255, 255, 255, 0.9) 100%
+  );
+
+  --grid-stroke-light: rgba(0, 0, 0, 0.05);
+}
+
+.dark {
+  /* 🌙 Dark mode */
+  --background: #1A1A1A;
+  --foreground: #FAFAFA;
+
+  --primary: #71A9DA;
+  --primary-foreground: #0B192E;
+
+  --secondary: #FFBF68;
+  --secondary-foreground: #1C1C1C;
+
+  --accent: #FED6B3;
+  --accent-foreground: #1C1C1C;
+
+  --muted: #444444;
+  --muted-foreground: #CCCCCC;
+
+  --border: #444;
+  --input: #3A3A3A;
+  --ring: #71A9DA;
+  --destructive: #F87171;
+
+  --card: #2A2A2A;
+  --card-foreground: #FAFAFA;
+  --popover: #2A2A2A;
+  --popover-foreground: #FAFAFA;
+
+  --glass-background: rgba(20, 20, 20, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  --glass-blur: blur(14px);
+
+  --grid-stroke-light: rgba(255, 255, 255, 0.05);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Optional animation config */
+@theme inline {
+  --animate-scroll: scroll var(--animation-duration, 40s) var(--animation-direction, forwards) linear infinite;
+
+  @keyframes scroll {
+    to {
+      transform: translate(calc(-50% - 0.5rem));
+    }
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "model_name_or_path": "Fathualr/sentiment-analysis-30k-product-review",
+  "task": "text-classification"
+}
