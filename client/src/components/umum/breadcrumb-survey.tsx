@@ -31,6 +31,7 @@ const NAV_OPTIONS = [
   { label: 'Overview', href: '/manage-survey/overview' },
   { label: 'Responses', href: '/manage-survey/responses' },
   { label: 'Analysis', href: '/manage-survey/analysis' },
+  { label: 'Results', href: '/manage-survey/results' },
 ];
 
 const ALLOWED_STATUSES = ['published', 'closed', 'archived'];
