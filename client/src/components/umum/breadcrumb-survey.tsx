@@ -1,40 +1,40 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useIsMobile } from '@/hooks/useMobile';
-import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useUserSurvey } from '@/features/survey/hooks/useUserSurveys';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useIsMobile } from "@/hooks/useMobile";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { useUserSurvey } from "@/features/survey/hooks/useUserSurveys";
 import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
+} from "@/components/ui/breadcrumb";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { ChevronDown, Newspaper, SlashIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import React from 'react';
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown, Newspaper, SlashIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import React from "react";
 
 interface SurveyBreadcrumbNavProps {
   surveyId: string;
 }
 
 const NAV_OPTIONS = [
-  { label: 'Edit', href: '/manage-survey/edit' },
-  { label: 'Overview', href: '/manage-survey/overview' },
-  { label: 'Responses', href: '/manage-survey/responses' },
-  { label: 'Analysis', href: '/manage-survey/analysis' },
-  { label: 'Results', href: '/manage-survey/results' },
+  { label: "Edit", href: "/manage-survey/edit" },
+  { label: "Overview", href: "/manage-survey/overview" },
+  { label: "Responses", href: "/manage-survey/responses" },
+  { label: "Analysis", href: "/manage-survey/analysis" },
+  { label: "Report", href: "/manage-survey/ai-analytics" },
 ];
 
-const ALLOWED_STATUSES = ['published', 'closed', 'archived'];
+const ALLOWED_STATUSES = ["published", "closed", "archived"];
 
 export function SurveyBreadcrumbNav({ surveyId }: SurveyBreadcrumbNavProps) {
   const pathname = usePathname();
@@ -42,14 +42,18 @@ export function SurveyBreadcrumbNav({ surveyId }: SurveyBreadcrumbNavProps) {
 
   const { isLoggedIn, loading: authLoading } = useAuth();
   const shouldFetch = isLoggedIn && !authLoading;
-  const { data: survey, isLoading, isError } = useUserSurvey(surveyId, shouldFetch);
+  const {
+    data: survey,
+    isLoading,
+    isError,
+  } = useUserSurvey(surveyId, shouldFetch);
 
   if (isLoading || isError || !survey) return null;
 
   const isAllowedStatus = ALLOWED_STATUSES.includes(survey.status);
   const visibleNav = isAllowedStatus
     ? NAV_OPTIONS
-    : NAV_OPTIONS.filter((item) => item.label === 'Edit');
+    : NAV_OPTIONS.filter((item) => item.label === "Edit");
 
   const active = visibleNav.find((item) =>
     pathname.startsWith(`${item.href}/${surveyId}`)
@@ -59,13 +63,12 @@ export function SurveyBreadcrumbNav({ surveyId }: SurveyBreadcrumbNavProps) {
     <Breadcrumb
       className="mt-2 select-none bg-background/60 backdrop-blur-md px-3 py-1 rounded-lg border border-border shadow-sm"
       style={{
-        background: 'var(--glass-background)',
-        borderColor: 'var(--glass-border)',
+        background: "var(--glass-background)",
+        borderColor: "var(--glass-border)",
       }}
     >
       <BreadcrumbList className="flex flex-wrap gap-2 items-center">
-
-        <Newspaper className="w-4 h-4"/>
+        <Newspaper className="w-4 h-4" />
 
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
@@ -79,7 +82,7 @@ export function SurveyBreadcrumbNav({ surveyId }: SurveyBreadcrumbNavProps) {
           <BreadcrumbItem>
             <DropdownMenu>
               <DropdownMenuTrigger className="cursor-pointer flex gap-2 items-center text-foreground font-medium">
-                {active?.label ?? 'Select'} <ChevronDown className="w-4 h-4"/>
+                {active?.label ?? "Select"} <ChevronDown className="w-4 h-4" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
                 {visibleNav.map((item) => (
@@ -102,8 +105,8 @@ export function SurveyBreadcrumbNav({ surveyId }: SurveyBreadcrumbNavProps) {
                     <Link
                       href={`${item.href}/${surveyId}`}
                       className={cn(
-                        'font-semibold text-sm',
-                        isActive ? 'text-foreground' : 'text-muted-foreground'
+                        "font-semibold text-sm",
+                        isActive ? "text-foreground" : "text-muted-foreground"
                       )}
                     >
                       {item.label}

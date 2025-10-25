@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
-import { useAuth } from '@/features/auth/hooks/useAuth';
-import Link from 'next/link';
-import { Newspaper , LayoutGrid, Coins } from 'lucide-react';
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import Link from "next/link";
+import { Newspaper, LayoutGrid, Coins } from "lucide-react";
 
 const navItems = [
-  { href: '/explore', label: 'Explore Survey', icon: LayoutGrid },
-  { href: '/manage-survey', label: 'Manage Survey', icon: Newspaper  },
-  { href: '/exchange', label: 'Point Exchange', icon: Coins },
+  { href: "/explore", label: "Explore Survey", icon: LayoutGrid },
+  { href: "/manage-survey", label: "Manage Survey", icon: Newspaper },
+  { href: "/exchange", label: "Point Exchange", icon: Coins },
 ];
 
 export function NavUmum() {
@@ -15,8 +15,8 @@ export function NavUmum() {
   if (!isLoggedIn) return null;
 
   return (
-    <nav className="pt-6 w-full">
-      <ul className="flex flex-wrap gap-4">
+    <nav className="w-full">
+      <ul className="flex flex-wrap gap-4 justify-center mt-8" >
         {navItems.map(({ href, label, icon: Icon }) => (
           <li key={href} className="flex-1 md:max-w-[200px]">
             <Link
@@ -25,11 +25,10 @@ export function NavUmum() {
                 backdrop-blur-xl border border-glass-border transition-all duration-200 shadow-md hover:shadow-lg hover:scale-[1.02]"
               style={{
                 background: `
-                  radial-gradient(circle at 30% 30%, rgba(255, 200, 120, 0.25), transparent 80%),
-                  radial-gradient(circle at bottom right, rgba(255, 160, 90, 0.15), transparent 70%)`
-                ,
-                backdropFilter: 'var(--glass-blur)',
-                borderColor: 'var(--glass-border)',
+                  radial-gradient(circle at 30% 30%, rgba(59, 130, 246, 0.25), transparent 80%),
+                  radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.15), transparent 70%)`,
+                backdropFilter: "var(--glass-blur)",
+                borderColor: "var(--glass-border)",
               }}
             >
               <Icon className="w-4 h-4 text-foreground" />

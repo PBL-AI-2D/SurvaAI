@@ -30,3 +30,18 @@ export const deletePembayaranSurvei = async (req, res) => {
     resFail(res, error.message, error.status);
   }
 };
+
+export const createPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // panggil service untuk membuat pembayaran survei (misalnya via Xendit)
+    const result = await pembayaranSurveiService.createPayment(id);
+
+    resSuccess(res, 'Invoice created successfully', result);
+  } catch (error) {
+    console.error('createPayment error:', error);
+    resFail(res, error.message || 'Failed to create payment', error.status || 500);
+  }
+};
+
