@@ -96,7 +96,6 @@ export function AdminSidebar() {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-
             <Separator className="border border-foreground/10" />
             <SidebarGroupLabel className="grid content-center h-4 text-foreground/75">
               Data
@@ -213,10 +212,29 @@ export function AdminSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
 
+            {/* ====== GARIS BARU ====== */}
+<Separator className="border border-foreground/10 my-1" />
+
+{/* ====== AI Monitoring (baru) ====== */}
+<SidebarMenuItem className="rounded-sm">
+  <SidebarMenuButton
+    asChild
+    tooltip="AI Monitoring"
+    className="text-foreground bg-background hover:text-background hover:bg-muted-foreground h-10 transition"
+  >
+    <Link href="/admin/ai-monitoring" className="flex items-center gap-2" onClick={handleNav}>
+      <LayoutDashboard />
+      AI Monitoring
+    </Link>
+  </SidebarMenuButton>
+</SidebarMenuItem>
+
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
       <SidebarRail />
     </Sidebar>
+
+    
   );
 }

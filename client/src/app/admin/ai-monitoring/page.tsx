@@ -29,8 +29,9 @@ import { cn } from "@/lib/utils";
 
 export default function AdminAIMonitoringPage() {
   const [open, setOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("Satisfaction Classifier");
 
-  // KPI
+  // Dummy data (wireframe)
   const kpis = [
     { label: "Model Accuracy", value: "92.8%", badge: "Excellent" },
     { label: "Precision", value: "92.5%", badge: "Excellent" },
@@ -38,7 +39,6 @@ export default function AdminAIMonitoringPage() {
     { label: "F1 Score", value: "92.8%", badge: "Excellent" },
   ];
 
-  // Data tren
   const trend = [
     { iter: "Iter 1", accuracy: 81, f1: 80, precision: 82, recall: 79 },
     { iter: "Iter 2", accuracy: 85, f1: 84, precision: 85, recall: 83 },
@@ -48,19 +48,13 @@ export default function AdminAIMonitoringPage() {
     { iter: "Iter 6", accuracy: 92, f1: 92, precision: 92, recall: 91 },
   ];
 
-  // Palet warna (dibedakan jelas)
-  const COLOR = {
-    accuracy:  "#2563eb", // biru
-    f1:        "#22c55e", // hijau
-    precision: "#eab308", // kuning
-    recall:    "#ef4444", // merah
-  };
-
   const models = [
     { name: "Satisfaction Classifier", version: "v2.4.1", acc: "92.8%", updated: "Mar 18, 2025", status: "Active" },
     { name: "Preference Segmentation", version: "v1.8.3", acc: "88.7%", updated: "Mar 15, 2025", status: "Active" },
     { name: "Sentiment Analysis", version: "v3.1.0", acc: "94.2%", updated: "Mar 12, 2025", status: "Active" },
     { name: "Response Quality Filter", version: "v1.2.5", acc: "88.5%", updated: "Mar 10, 2025", status: "Active" },
+    { name: "Churn Predictor", version: "v3.0.2", acc: "90.1%", updated: "Mar 20, 2025", status: "Active" },
+    { name: "Engagement Ranker", version: "v2.6.0", acc: "89.4%", updated: "Mar 17, 2025", status: "Active" },
   ];
 
   const logs = [
@@ -73,7 +67,7 @@ export default function AdminAIMonitoringPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Search */}
+      {/* Top bar: search */}
       <div className="flex items-center gap-3">
         <div className="relative w-full max-w-xl">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-70" />
@@ -81,7 +75,7 @@ export default function AdminAIMonitoringPage() {
         </div>
       </div>
 
-      {/* KPI */}
+      {/* KPI cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {kpis.map((k) => (
           <Card key={k.label} className="bg-muted/30 border-muted-foreground/20">
@@ -99,11 +93,23 @@ export default function AdminAIMonitoringPage() {
         ))}
       </div>
 
-      {/* Trend */}
+      {/* Trend chart + dropdown */}
       <Card className="bg-muted/30 border-muted-foreground/20">
-        <CardHeader>
+        <CardHeader className="flex items-center justify-between">
           <CardTitle className="text-base text-muted-foreground">Model Performance Trend</CardTitle>
+
+          {/* Dropdown di kanan */}
+          <select
+            className="rounded-md border bg-background px-3 py-2 text-sm"
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+          >
+            {models.map((m) => (
+              <option key={m.name} value={m.name}>{m.name}</option>
+            ))}
+          </select>
         </CardHeader>
+
         <CardContent className="h-72">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={trend} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
@@ -112,64 +118,18 @@ export default function AdminAIMonitoringPage() {
               <YAxis domain={[70, 100]} />
               <Tooltip />
               <Legend />
-
-              {/* Accuracy: biru solid */}
-              <Line
-                type="monotone"
-                dataKey="accuracy"
-                name="accuracy"
-                stroke={COLOR.accuracy}
-                strokeWidth={2.8}
-                dot={{ r: 3, stroke: COLOR.accuracy, fill: COLOR.accuracy }}
-                activeDot={{ r: 6, fill: COLOR.accuracy, stroke: COLOR.accuracy }}
-                isAnimationActive={false}
-              />
-
-              {/* F1: hijau dashed */}
-              <Line
-                type="monotone"
-                dataKey="f1"
-                name="f1"
-                stroke={COLOR.f1}
-                strokeWidth={2.2}
-                strokeDasharray="6 4"
-                dot={{ r: 2.8, stroke: COLOR.f1, fill: COLOR.f1 }}
-                activeDot={{ r: 6, fill: COLOR.f1, stroke: COLOR.f1 }}
-                isAnimationActive={false}
-              />
-
-              {/* Precision: kuning dash-dot */}
-              <Line
-                type="monotone"
-                dataKey="precision"
-                name="precision"
-                stroke={COLOR.precision}
-                strokeWidth={2}
-                strokeDasharray="3 3 1 3"
-                dot={{ r: 2.8, stroke: COLOR.precision, fill: COLOR.precision }}
-                activeDot={{ r: 6, fill: COLOR.precision, stroke: COLOR.precision }}
-                isAnimationActive={false}
-              />
-
-              {/* Recall: merah dotted */}
-              <Line
-                type="monotone"
-                dataKey="recall"
-                name="recall"
-                stroke={COLOR.recall}
-                strokeWidth={2}
-                strokeDasharray="2 6"
-                dot={{ r: 2.8, stroke: COLOR.recall, fill: COLOR.recall }}
-                activeDot={{ r: 6, fill: COLOR.recall, stroke: COLOR.recall }}
-                isAnimationActive={false}
-              />
+              <Line type="monotone" dataKey="accuracy" stroke="#2563eb" strokeWidth={2.5} dot={false} />
+              <Line type="monotone" dataKey="f1" stroke="#22c55e" strokeDasharray="6 4" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="precision" stroke="#eab308" strokeDasharray="3 3 1 3" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="recall" stroke="#ef4444" strokeDasharray="2 6" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>
 
-      {/* Tabel + Log */}
+      {/* Lower grid: table + notifications */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        {/* Deployed models */}
         <Card className="xl:col-span-2 bg-muted/30 border-muted-foreground/20">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Deployed Models</CardTitle>
@@ -208,16 +168,19 @@ export default function AdminAIMonitoringPage() {
                             <DrawerTitle>Update Model</DrawerTitle>
                           </DrawerHeader>
                           <div className="px-6 pb-6 space-y-6">
+                            {/* Model Type */}
                             <div>
                               <label className="text-sm text-muted-foreground">Model Type</label>
-                              <select className="w-full mt-2 rounded-md border bg-background px-3 py-2 text-sm">
-                                <option value="">Select model type</option>
-                                <option>Satisfaction Classifier</option>
-                                <option>Preference Segmentation</option>
-                                <option>Sentiment Analysis</option>
-                                <option>Response Quality Filter</option>
-                              </select>
+                              <div className="mt-2">
+                                <select className="w-full rounded-md border bg-background px-3 py-2 text-sm">
+                                  {models.map((m) => (
+                                    <option key={m.name}>{m.name}</option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
+
+                            {/* Upload Dataset */}
                             <div>
                               <label className="text-sm text-muted-foreground">Upload Dataset</label>
                               <div className="mt-2 flex flex-col items-center justify-center border border-dashed rounded-lg py-10">
@@ -227,6 +190,7 @@ export default function AdminAIMonitoringPage() {
                                 <input type="file" accept=".csv" className="mt-3 text-sm" />
                               </div>
                             </div>
+
                             <Button className="w-full" onClick={() => setOpen(false)}>
                               Start Retraining
                             </Button>
@@ -241,6 +205,7 @@ export default function AdminAIMonitoringPage() {
           </CardContent>
         </Card>
 
+        {/* Notification log */}
         <Card className="bg-muted/30 border-muted-foreground/20">
           <CardHeader>
             <CardTitle className="text-base">Notification Log</CardTitle>
