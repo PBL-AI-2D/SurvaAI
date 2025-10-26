@@ -1,4 +1,4 @@
-import { SurveyResponsesPage } from '@/components/pages/main/survey-responses';
+  import { SurveyResponsesPage } from '@/components/pages/main/survey-responses';
 import type { Metadata } from 'next';
 
 type Props = {
