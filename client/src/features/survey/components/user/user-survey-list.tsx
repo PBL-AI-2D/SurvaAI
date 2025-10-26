@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { UserSurveyCard } from './user-survey-card';
-import { useUserSurveys } from '../../hooks/useUserSurveys';
-import { useAuth } from '@/features/auth/hooks/useAuth';
-import { NewSurveyCard } from './new-survey-card';
-import { Button } from '@/components/ui/button';
-import { Pagination } from '@/components/umum/pagination';
+import { UserSurveyCard } from "./user-survey-card";
+import { useUserSurveys } from "../../hooks/useUserSurveys";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { NewSurveyCard } from "./new-survey-card";
+import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/umum/pagination";
 
 interface UserSurveyListProps {
   page: number;
@@ -17,20 +17,14 @@ interface UserSurveyListProps {
 export function UserSurveyList({
   page,
   limit = 8,
-  filters = { sort: "-updated_at"},
+  filters = { sort: "-updated_at" },
   onPageChange,
 }: UserSurveyListProps) {
   const { isLoggedIn, loading: authLoading } = useAuth();
   const shouldFetch = isLoggedIn && !authLoading;
 
-  const {
-    surveys,
-    isLoading,
-    isError,
-    errorMessage,
-    refetch,
-    meta,
-  } = useUserSurveys({ page, limit, filters, enabled: shouldFetch });
+  const { surveys, isLoading, isError, errorMessage, refetch, meta } =
+    useUserSurveys({ page, limit, filters, enabled: shouldFetch });
 
   const totalPages = meta?.total_pages ?? 1;
 
@@ -42,10 +36,10 @@ export function UserSurveyList({
             key={i}
             className="animate-pulse h-[250px] rounded-xl bg-glass-bg backdrop-blur-lg border border-glass-border shadow-inner"
             style={{
-              background: 'var(--glass-background)',
-              borderColor: 'var(--glass-border)',
-              backdropFilter: 'var(--glass-blur)',
-              boxShadow: 'var(--glass-shadow)',
+              background: "var(--glass-background)",
+              borderColor: "var(--glass-border)",
+              backdropFilter: "var(--glass-blur)",
+              boxShadow: "var(--glass-shadow)",
             }}
           />
         ))}
@@ -58,14 +52,14 @@ export function UserSurveyList({
       <div
         className="flex flex-col gap-4 items-center justify-center text-center px-6 py-8 rounded-2xl bg-glass-bg backdrop-blur-xl border border-glass-border shadow-md"
         style={{
-          background: 'var(--glass-background)',
-          borderColor: 'var(--glass-border)',
-          boxShadow: 'var(--glass-shadow)',
-          backdropFilter: 'var(--glass-blur)',
+          background: "var(--glass-background)",
+          borderColor: "var(--glass-border)",
+          boxShadow: "var(--glass-shadow)",
+          backdropFilter: "var(--glass-blur)",
         }}
       >
         <p className="text-destructive font-medium">
-          {errorMessage || 'Gagal memuat survei kamu.'}
+          {errorMessage || "Gagal memuat survei kamu."}
         </p>
         {refetch && (
           <Button
@@ -73,9 +67,9 @@ export function UserSurveyList({
             className="px-5 py-2 text-sm font-semibold rounded-lg border border-glass-border backdrop-blur-md shadow-md 
               bg-destructive/50 dark:bg-destructive/50 text-foreground hover:bg-destructive/40 dark:hover:bg-destructive/20 transition"
             style={{
-              borderColor: 'var(--glass-border)',
-              backdropFilter: 'var(--glass-blur)',
-              boxShadow: 'var(--glass-shadow)',
+              borderColor: "var(--glass-border)",
+              backdropFilter: "var(--glass-blur)",
+              boxShadow: "var(--glass-shadow)",
             }}
           >
             Coba Lagi
@@ -87,9 +81,7 @@ export function UserSurveyList({
 
   if (surveys.length === 0) {
     return (
-      <div
-        className="grid lg:grid-cols-4 grid-cols-2 md:gap-5 gap-3"
-      >
+      <div className="grid lg:grid-cols-4 grid-cols-2 md:gap-5 gap-3">
         <NewSurveyCard />
       </div>
     );
@@ -101,11 +93,9 @@ export function UserSurveyList({
         <div className="grid lg:grid-cols-4 grid-cols-2 md:gap-5 gap-3">
           {page === 1 && <NewSurveyCard />}
 
-          {surveys
-            .slice(0, page === 1 ? limit - 1 : limit)
-            .map((survey) => (
-              <UserSurveyCard key={survey.id} surveys={survey} />
-            ))}
+          {surveys.slice(0, page === 1 ? limit - 1 : limit).map((survey) => (
+            <UserSurveyCard key={survey.id} surveys={survey} />
+          ))}
         </div>
       </div>
 

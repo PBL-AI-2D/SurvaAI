@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { PertanyaanSurvei } from '@/features/survey/types/types';
+import { PertanyaanSurvei } from "@/features/survey/types/types";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Check, Circle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+} from "@/components/ui/select";
+import { Check, Circle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface QuestionRendererProps {
   question: PertanyaanSurvei;
@@ -17,10 +17,14 @@ interface QuestionRendererProps {
   onChange: (value: any) => void;
 }
 
-export function QuestionRenderer({ question, value, onChange }: QuestionRendererProps) {
+export function QuestionRenderer({
+  question,
+  value,
+  onChange,
+}: QuestionRendererProps) {
   const { teks_pertanyaan, tipe_pertanyaan, opsi, is_required } = question;
 
-  const safeString = (val: any) => (typeof val === 'string' ? val : '');
+  const safeString = (val: any) => (typeof val === "string" ? val : "");
 
   return (
     <div className="w-full flex flex-col gap-4 text-foreground">
@@ -30,7 +34,7 @@ export function QuestionRenderer({ question, value, onChange }: QuestionRenderer
       </label>
 
       {/* Pilihan Ganda */}
-      {tipe_pertanyaan === 'pilihan_ganda' && (
+      {tipe_pertanyaan === "pilihan_ganda" && (
         <div className="space-y-2">
           {opsi.map((opt) => {
             const isSelected = safeString(value) === opt;
@@ -40,17 +44,24 @@ export function QuestionRenderer({ question, value, onChange }: QuestionRenderer
                 className={`
                   flex items-center gap-3 px-4 py-2 rounded-xl cursor-pointer transition-all
                   border backdrop-blur-[var(--glass-blur)]
-                  ${isSelected
-                    ? 'bg-secondary-1/25 dark:bg-secondary-1/15 border-[var(--glass-border)]'
-                    : 'bg-[var(--glass-bg)] border-[var(--glass-border)] hover:bg-muted/40'
+                  ${
+                    isSelected
+                      ? "bg-secondary-1/25 dark:bg-secondary-1/15 border-[var(--glass-border)]"
+                      : "bg-[var(--glass-bg)] border-[var(--glass-border)] hover:bg-muted/40"
                   }
                 `}
               >
                 <span
                   className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition
-                    ${isSelected ? 'bg-foreground/70 border-foreground' : 'border-muted-foreground'}`}
+                    ${
+                      isSelected
+                        ? "bg-foreground/70 border-foreground"
+                        : "border-muted-foreground"
+                    }`}
                 >
-                  {isSelected && <Circle className="w-2.5 h-2.5 text-foreground/30" />}
+                  {isSelected && (
+                    <Circle className="w-2.5 h-2.5 text-foreground/30" />
+                  )}
                 </span>
                 <input
                   type="radio"
@@ -68,7 +79,7 @@ export function QuestionRenderer({ question, value, onChange }: QuestionRenderer
       )}
 
       {/* Checkbox */}
-      {tipe_pertanyaan === 'checkbox' && (
+      {tipe_pertanyaan === "checkbox" && (
         <div className="space-y-2">
           {opsi.map((opt) => {
             const selected = Array.isArray(value) ? value : [];
@@ -79,17 +90,24 @@ export function QuestionRenderer({ question, value, onChange }: QuestionRenderer
                 className={`
                   flex items-center gap-3 px-4 py-2 rounded-xl cursor-pointer transition-all
                   border backdrop-blur-[var(--glass-blur)]
-                  ${isChecked
-                    ? 'bg-secondary-1/25 dark:bg-secondary-1/15 border-[var(--glass-border)]'
-                    : 'bg-[var(--glass-bg)] border-[var(--glass-border)] hover:bg-muted/40'
+                  ${
+                    isChecked
+                      ? "bg-secondary-1/25 dark:bg-secondary-1/15 border-[var(--glass-border)]"
+                      : "bg-[var(--glass-bg)] border-[var(--glass-border)] hover:bg-muted/40"
                   }
                 `}
               >
                 <span
                   className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition
-                    ${isChecked ? 'bg-foreground/70 border-foreground' : 'border-muted-foreground'}`}
+                    ${
+                      isChecked
+                        ? "bg-foreground/70 border-foreground"
+                        : "border-muted-foreground"
+                    }`}
                 >
-                  {isChecked && <Check className="w-3.5 h-3.5 text-foreground/30" />}
+                  {isChecked && (
+                    <Check className="w-3.5 h-3.5 text-foreground/30" />
+                  )}
                 </span>
                 <input
                   type="checkbox"
@@ -114,7 +132,7 @@ export function QuestionRenderer({ question, value, onChange }: QuestionRenderer
       )}
 
       {/* Dropdown */}
-      {tipe_pertanyaan === 'dropdown' && (
+      {tipe_pertanyaan === "dropdown" && (
         <Select value={safeString(value)} onValueChange={onChange}>
           <SelectTrigger
             className={`
@@ -125,9 +143,7 @@ export function QuestionRenderer({ question, value, onChange }: QuestionRenderer
           >
             <SelectValue placeholder="Select an option" />
           </SelectTrigger>
-          <SelectContent
-            className="bg-[var(--glass-bg)] border-[var(--glass-border)] backdrop-blur-[var(--glass-blur)] text-foreground"
-          >
+          <SelectContent className="bg-[var(--glass-bg)] border-[var(--glass-border)] backdrop-blur-[var(--glass-blur)] text-foreground">
             {opsi.map((opt) => (
               <SelectItem key={opt} value={opt}>
                 {opt}
@@ -138,7 +154,7 @@ export function QuestionRenderer({ question, value, onChange }: QuestionRenderer
       )}
 
       {/* Skala */}
-      {tipe_pertanyaan === 'skala' && (
+      {tipe_pertanyaan === "skala" && (
         <div className="flex flex-col gap-3">
           <div className="text-sm text-center text-muted-foreground px-1">
             <span>{opsi[0]}</span>
@@ -154,9 +170,10 @@ export function QuestionRenderer({ question, value, onChange }: QuestionRenderer
                   className={`
                     w-full text-left text-sm font-medium rounded-xl px-4 py-3 transition-all
                     border backdrop-blur-[var(--glass-blur)] text-foreground
-                    ${isSelected
-                      ? 'bg-secondary-1/25 dark:bg-secondary-1/15 border-[var(--glass-border)]'
-                      : 'bg-[var(--glass-bg)] border-[var(--glass-border)] hover:bg-muted/40'
+                    ${
+                      isSelected
+                        ? "bg-secondary-1/25 dark:bg-secondary-1/15 border-[var(--glass-border)]"
+                        : "bg-[var(--glass-bg)] border-[var(--glass-border)] hover:bg-muted/40"
                     }
                   `}
                 >
@@ -172,7 +189,7 @@ export function QuestionRenderer({ question, value, onChange }: QuestionRenderer
       )}
 
       {/* Essay */}
-      {tipe_pertanyaan === 'essay' && (
+      {tipe_pertanyaan === "essay" && (
         <textarea
           className={`
             w-full rounded-xl px-4 py-3 resize-none
@@ -182,7 +199,7 @@ export function QuestionRenderer({ question, value, onChange }: QuestionRenderer
           `}
           value={safeString(value)}
           onChange={(e) => {
-            const val = e.target.value.trim();
+            const val = e.target.value;
             onChange(val.length > 0 ? val : null);
           }}
           placeholder="Write your answer here..."

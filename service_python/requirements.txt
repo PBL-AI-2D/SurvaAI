@@ -47,3 +47,9 @@ uvicorn==0.34.3
 wordcloud==1.9.4
 pytest
 selenium
+scikit-learn
+joblib
+sentence-transformers
+numpy
+pandas
+matplotlib
