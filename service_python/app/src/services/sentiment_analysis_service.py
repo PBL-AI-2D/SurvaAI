@@ -1,10 +1,15 @@
 import json
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
-import torch.nn.functional as F
-import torch
+from pathlib import Path
 from typing import List, Dict
 
-with open("ai_models/sentiment_analysis_config.json") as f:
+import torch
+import torch.nn.functional as F
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+BASE_DIR = Path(__file__).resolve().parents[3]
+CONFIG_PATH = BASE_DIR / "ai_models" / "sentiment_analysis_config.json"
+
+with CONFIG_PATH.open() as f:
     config = json.load(f)
 
 MODEL_PATH = config["model_name_or_path"]

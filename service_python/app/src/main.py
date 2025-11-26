@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.src.config import settings
-from app.src.routers import sentiment_analysis_router
-from app.src.routers import wordcloud_routers
+from service_python.app.src.config import settings
+from service_python.app.src.routers import sentiment_analysis_router
+from service_python.app.src.routers import wordcloud_routers
+from service_python.app.src.routers import preference_analysis_router
+from service_python.app.src.routers import satisfaction_analysis_router
 
 app = FastAPI(title=settings.app_name)
 
@@ -20,3 +22,5 @@ async def read_root():
 
 app.include_router(sentiment_analysis_router.router, prefix="/api")
 app.include_router(wordcloud_routers.router, prefix="/api")
+app.include_router(preference_analysis_router.router, prefix="/api")
+app.include_router(satisfaction_analysis_router.router, prefix="/api")

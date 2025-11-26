@@ -1,6 +1,6 @@
 from fastapi import APIRouter
-from app.src.schemas.sentiment_analysis import SingleTextInput, MultipleTextInput, APIResponse
-from app.src.services import sentiment_analysis_service
+from service_python.app.src.schemas.sentiment_analysis import SingleTextInput, MultipleTextInput, APIResponse
+from service_python.app.src.services import sentiment_analysis_service
 
 router = APIRouter(prefix="/sentiment", tags=["Sentiment"])
 

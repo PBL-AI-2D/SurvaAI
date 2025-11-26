@@ -4,7 +4,7 @@ import re
 from typing import List
 from wordcloud import WordCloud
 
-with open("app/data/stopwords-id.json", "r", encoding="utf-8") as f:
+with open("service_python/app/data/stopwords-id.json", "r", encoding="utf-8") as f:
     stopwords = set(json.load(f))
 
 def preprocess(text: str) -> str:
