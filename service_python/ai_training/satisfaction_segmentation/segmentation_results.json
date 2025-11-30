@@ -1,0 +1,150 @@
+{
+  "k_used": 4,
+  "clusters": [
+    2,
+    3,
+    0,
+    3,
+    1,
+    0
+  ],
+  "k_analysis": {
+    "k_min": 2,
+    "k_max": 5,
+    "inertia": {
+      "2": 34.392215103767136,
+      "3": 23.382562675217166,
+      "4": 10.097301606275849,
+      "5": 1.260455562306406
+    },
+    "silhouette": {
+      "2": 0.18154317428120503,
+      "3": 0.11622168647412699,
+      "4": 0.21219385031415805,
+      "5": 0.20217656145647425
+    },
+    "recommended_k": 4
+  },
+  "preference_summary": {
+    "0": [
+      {
+        "feature": "age",
+        "score": 23.5
+      },
+      {
+        "feature": "male",
+        "score": 1.0
+      },
+      {
+        "feature": "region_jawa",
+        "score": 1.0
+      },
+      {
+        "feature": "prefer_online",
+        "score": 1.0
+      },
+      {
+        "feature": "female",
+        "score": 0.0
+      }
+    ],
+    "1": [
+      {
+        "feature": "age",
+        "score": 35.0
+      },
+      {
+        "feature": "female",
+        "score": 1.0
+      },
+      {
+        "feature": "region_sumatra",
+        "score": 1.0
+      },
+      {
+        "feature": "prefer_online",
+        "score": 1.0
+      },
+      {
+        "feature": "male",
+        "score": 0.0
+      }
+    ],
+    "2": [
+      {
+        "feature": "age",
+        "score": 21.0
+      },
+      {
+        "feature": "female",
+        "score": 1.0
+      },
+      {
+        "feature": "region_jawa",
+        "score": 1.0
+      },
+      {
+        "feature": "prefer_online",
+        "score": 1.0
+      },
+      {
+        "feature": "male",
+        "score": 0.0
+      }
+    ],
+    "3": [
+      {
+        "feature": "age",
+        "score": 29.0
+      },
+      {
+        "feature": "prefer_offline",
+        "score": 1.0
+      },
+      {
+        "feature": "female",
+        "score": 0.5
+      },
+      {
+        "feature": "male",
+        "score": 0.5
+      },
+      {
+        "feature": "region_jawa",
+        "score": 0.5
+      }
+    ]
+  },
+  "pca_2d": [
+    {
+      "x": 0.7506979677729956,
+      "y": -2.584860390094507,
+      "cluster": 2
+    },
+    {
+      "x": 0.4263733050262767,
+      "y": 3.150092144435068,
+      "cluster": 3
+    },
+    {
+      "x": -2.670590770185023,
+      "y": -0.008466690842094999,
+      "cluster": 0
+    },
+    {
+      "x": 0.13287519799787897,
+      "y": 0.38510535200101687,
+      "cluster": 3
+    },
+    {
+      "x": 3.414018468711553,
+      "y": -0.2579767447974947,
+      "cluster": 1
+    },
+    {
+      "x": -2.053374169323681,
+      "y": -0.6838936707019866,
+      "cluster": 0
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+respondent_id,text,satisfaction_score,sentiment_label,sentiment_score,likert_service_quality_normalized,likert_price_fairness_normalized,likert_accessibility_normalized
+1,"Pelayanan sangat cepat dan ramah, saya puas sekali dengan kualitasnya.",0.9166666666666666,positive,0.94,1.0,0.75,1.0
+2,"Harganya terlalu mahal, tapi kualitas cukup baik dan mudah diakses.",0.5,positive,0.51,0.75,0.25,0.5
+3,"Sulit diakses dan respon CS lama, saya kurang puas dengan pelayanan.",0.25,negative,0.52,0.25,0.5,0.0
+4,"Produknya bagus, harga wajar, tapi aksesnya agak jauh dari rumah.",0.5833333333333334,positive,0.63,0.75,0.75,0.25
+5,"Sangat puas dengan semua aspek, pelayanan, harga, dan akses semuanya memuaskan.",1.0,positive,0.91,1.0,1.0,1.0
+6,"Harga murah tapi kualitas kurang, pelayanan biasa saja.",0.5833333333333334,neutral,0.5,0.5,0.75,0.5

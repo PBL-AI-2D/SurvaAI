@@ -5,6 +5,8 @@ from service_python.app.src.routers import sentiment_analysis_router
 from service_python.app.src.routers import wordcloud_routers
 from service_python.app.src.routers import preference_analysis_router
 from service_python.app.src.routers import satisfaction_analysis_router
+from service_python.app.src.routers import dashboard_router
+from service_python.app.src.routers import forecasting_router
 
 app = FastAPI(title=settings.app_name)
 
@@ -24,3 +26,5 @@ app.include_router(sentiment_analysis_router.router, prefix="/api")
 app.include_router(wordcloud_routers.router, prefix="/api")
 app.include_router(preference_analysis_router.router, prefix="/api")
 app.include_router(satisfaction_analysis_router.router, prefix="/api")
+app.include_router(dashboard_router.router, prefix="/api")
+app.include_router(forecasting_router.router, prefix="/api")

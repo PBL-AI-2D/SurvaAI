@@ -1,0 +1,90 @@
+{
+  "satisfaction_scores": [
+    0.9166666666666666,
+    0.5,
+    0.25,
+    0.5833333333333334,
+    1.0,
+    0.5833333333333334
+  ],
+  "sentiment_scores": [
+    0.94,
+    0.51,
+    0.52,
+    0.63,
+    0.91,
+    0.5
+  ],
+  "sentiment_labels": [
+    "positive",
+    "positive",
+    "negative",
+    "positive",
+    "positive",
+    "neutral"
+  ],
+  "likert_normalized": [
+    {
+      "service_quality": 1.0,
+      "price_fairness": 0.75,
+      "accessibility": 1.0
+    },
+    {
+      "service_quality": 0.75,
+      "price_fairness": 0.25,
+      "accessibility": 0.5
+    },
+    {
+      "service_quality": 0.25,
+      "price_fairness": 0.5,
+      "accessibility": 0.0
+    },
+    {
+      "service_quality": 0.75,
+      "price_fairness": 0.75,
+      "accessibility": 0.25
+    },
+    {
+      "service_quality": 1.0,
+      "price_fairness": 1.0,
+      "accessibility": 1.0
+    },
+    {
+      "service_quality": 0.5,
+      "price_fairness": 0.75,
+      "accessibility": 0.5
+    }
+  ],
+  "categorical_features": [
+    {
+      "age": 21,
+      "female": 1,
+      "male": 0
+    },
+    {
+      "age": 30,
+      "female": 0,
+      "male": 1
+    },
+    {
+      "age": 25,
+      "female": 0,
+      "male": 1
+    },
+    {
+      "age": 28,
+      "female": 1,
+      "male": 0
+    },
+    {
+      "age": 35,
+      "female": 1,
+      "male": 0
+    },
+    {
+      "age": 22,
+      "female": 0,
+      "male": 1
+    }
+  ]
+}
