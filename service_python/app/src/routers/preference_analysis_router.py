@@ -4,7 +4,7 @@ from service_python.app.src.schemas.preference_analysis import (
     SegmentationRequest,
     SegmentationResponse,
 )
-from service_python.app.src.services.preference_analysis_service import segment_respondents
+from service_python.app.src.services.segmentation_service import segment_respondents
 
 
 router = APIRouter(prefix="/preferences", tags=["Preferences & Segmentation"])

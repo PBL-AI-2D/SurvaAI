@@ -88,6 +88,21 @@ def segment_respondents(
     k_max: int = 10,
     random_state: int = 42,
 ) -> Dict[str, Any]:
+    """
+    Segmentasi responden menggunakan K-Means clustering.
+    
+    Args:
+        satisfaction_scores: Skor kepuasan per responden
+        sentiment_scores: Skor sentimen per responden
+        categorical_features: Fitur kategorikal per responden (optional)
+        k: Jumlah cluster (optional, akan dicari optimal jika None)
+        k_min: Minimum K untuk pencarian optimal
+        k_max: Maximum K untuk pencarian optimal
+        random_state: Random state untuk reproducibility
+    
+    Returns:
+        Dict dengan hasil segmentasi
+    """
     df_features, X = _build_feature_matrix(
         satisfaction_scores=satisfaction_scores,
         sentiment_scores=sentiment_scores,
@@ -144,5 +159,4 @@ def segment_respondents(
         "preference_summary": preference_summary,
         "pca_2d": pca_2d,
     }
-
 

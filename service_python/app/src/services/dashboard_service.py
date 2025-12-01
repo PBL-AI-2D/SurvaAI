@@ -5,22 +5,27 @@ import pandas as pd
 # Import services dengan fallback untuk berbagai konteks
 try:
     from service_python.app.src.services.satisfaction_analysis_service import analyze_satisfaction
-    from service_python.app.src.services.preference_analysis_service import segment_respondents
+    from service_python.app.src.services.segmentation_service import segment_respondents
+    from service_python.app.src.services.eti_service import calculate_eti_score, predict_trend_from_eti
+    from service_python.app.src.services.recommendation_service import generate_recommendations
 except ImportError:
     try:
         from app.src.services.satisfaction_analysis_service import analyze_satisfaction
-        from app.src.services.preference_analysis_service import segment_respondents
+        from app.src.services.segmentation_service import segment_respondents
+        from app.src.services.eti_service import calculate_eti_score, predict_trend_from_eti
+        from app.src.services.recommendation_service import generate_recommendations
     except ImportError:
         # Fallback untuk relative import jika diperlukan
         import sys
         from pathlib import Path
-        # Add parent to path jika belum ada
         current_file = Path(__file__).resolve()
         service_dir = current_file.parent
         if str(service_dir.parent.parent) not in sys.path:
             sys.path.insert(0, str(service_dir.parent.parent))
         from app.src.services.satisfaction_analysis_service import analyze_satisfaction
-        from app.src.services.preference_analysis_service import segment_respondents
+        from app.src.services.segmentation_service import segment_respondents
+        from app.src.services.eti_service import calculate_eti_score, predict_trend_from_eti
+        from app.src.services.recommendation_service import generate_recommendations
 
 
 def _calculate_satisfaction_percentage(sentiment_dist: Dict[str, int], total: int) -> Dict[str, float]:
@@ -71,6 +76,28 @@ def _extract_preference_from_categorical(
     # Sort by score descending
     sorted_prefs = dict(sorted(preference_scores.items(), key=lambda x: x[1], reverse=True))
     return sorted_prefs
+
+
+def _calculate_trend_from_eti(
+    sentiment_scores: List[float],
+    satisfaction_scores: List[float],
+) -> str:
+    """Hitung trend dari ETI score sederhana."""
+    try:
+        eti_scores = calculate_eti_score(
+            sentiment_scores=sentiment_scores,
+            satisfaction_scores=satisfaction_scores,
+        )
+        avg_eti = np.mean(eti_scores)
+        
+        if avg_eti > 0.7:
+            return "positive"
+        elif avg_eti < 0.4:
+            return "negative"
+        else:
+            return "stable"
+    except Exception:
+        return "stable"
 
 
 def _calculate_segment_details(
@@ -255,7 +282,9 @@ def generate_dashboard_data(
             "total_respondents": total_respondents,
             "avg_satisfaction_10": avg_satisfaction_10,
             "active_segments": ai2_result["k_used"],
-            "satisfaction_trend": "positive",  # TODO: implement trend analysis (AI-3)
+            "satisfaction_trend": _calculate_trend_from_eti(
+                sentiment_scores, satisfaction_scores
+            ),
         },
         
         # Raw data untuk chart
