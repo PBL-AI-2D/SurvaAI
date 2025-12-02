@@ -7,156 +7,153 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
 
-
 def _build_feature_matrix(
     satisfaction_scores: List[float],
     sentiment_scores: List[float],
-    categorical_features: Optional[List[Dict[str, Any]]] = None,
-) -> Tuple[pd.DataFrame, np.ndarray]:
+    product_features: List[Dict[str, int]], # Input: One-Hot (Produk A=1, Produk B=0, dst)
+) -> Tuple[pd.DataFrame, np.ndarray, List[str]]:
+    
+    # Base: Kepuasan & Sentimen
+    base_df = pd.DataFrame({
+        "satisfaction": satisfaction_scores,
+        "sentiment": sentiment_scores,
+    })
+    
+    # Fitur Produk/Preferensi (Wajib One-Hot Encoding: 0 atau 1)
+    # Contoh key: "suka_gratis_ongkir", "produk_baju", "fitur_darkmode"
+    prod_cols = []
+    if product_features:
+        prod_df = pd.DataFrame(product_features).fillna(0)
+        prod_cols = prod_df.columns.tolist()
+        base_df = pd.concat([base_df.reset_index(drop=True), prod_df.reset_index(drop=True)], axis=1)
+    
+    # Ambil nilai array numerik untuk clustering
+    X = base_df.select_dtypes(include=[np.number]).values
+    return base_df, X, prod_cols
 
-    if len(satisfaction_scores) != len(sentiment_scores):
-        raise ValueError("satisfaction_scores and sentiment_scores must have same length")
+def _analyze_cluster_affinity(
+    df_cluster: pd.DataFrame, 
+    product_cols: List[str]
+) -> List[Dict[str, Any]]:
+    """
+    Menganalisa produk apa yang paling diminati (Affinity High) di cluster ini.
+    """
+    if not product_cols or df_cluster.empty:
+        return []
 
-    n = len(satisfaction_scores)
-    if categorical_features is not None and len(categorical_features) != n:
-        raise ValueError("categorical_features length must match number of respondents")
-
-    base_df = pd.DataFrame(
-        {
-            "satisfaction": satisfaction_scores,
-            "sentiment": sentiment_scores,
-        }
-    )
-
-    if categorical_features:
-        cat_df = pd.DataFrame(categorical_features)
-        cat_df = cat_df.reset_index(drop=True)
-        base_df = pd.concat([base_df.reset_index(drop=True), cat_df], axis=1)
-
-    feature_columns = base_df.columns.tolist()
-
-    X = base_df.values.astype(float)
-    return base_df[feature_columns], X
-
-
-def _find_optimal_k(
-    X_scaled: np.ndarray,
-    k_min: int = 2,
-    k_max: int = 10,
-    random_state: int = 42,
-) -> Dict[str, Any]:
-    inertia_values: Dict[int, float] = {}
-    silhouette_values: Dict[int, float] = {}
-
-    for k in range(k_min, k_max + 1):
-        kmeans = KMeans(n_clusters=k, random_state=random_state, n_init="auto")
-        labels = kmeans.fit_predict(X_scaled)
-        inertia_values[k] = float(kmeans.inertia_)
-
-        if len(X_scaled) > k:
-            try:
-                silhouette_values[k] = float(silhouette_score(X_scaled, labels))
-            except ValueError:
-                silhouette_values[k] = float("nan")
-        else:
-            silhouette_values[k] = float("nan")
-
-    best_k = None
-    best_sil = -1.0
-    for k, sil in silhouette_values.items():
-        if np.isnan(sil):
-            continue
-        if sil > best_sil:
-            best_sil = sil
-            best_k = k
-
-    return {
-        "k_min": k_min,
-        "k_max": k_max,
-        "inertia": inertia_values,
-        "silhouette": silhouette_values,
-        "recommended_k": best_k,
-    }
-
+    # Hitung persentase user yg memilih fitur ini (Mean dari 0/1)
+    # Hasil: "fitur_A": 0.9 (90%), "fitur_B": 0.1 (10%)
+    affinity = df_cluster[product_cols].mean().sort_values(ascending=False)
+    
+    top_products = []
+    for feature_name, score in affinity.items():
+        # Hanya ambil jika diminati oleh minimal 20% populasi cluster (supaya relevan)
+        if score > 0.2: 
+            top_products.append({
+                "product_name": feature_name,
+                "affinity_score": float(score), # 0.0 - 1.0 (Persentase Popularitas)
+                "is_dominant": True if score > 0.6 else False # Label Dominan jika > 60%
+            })
+            
+    # Ambil Top 5 saja agar ringkas
+    return top_products[:5]
 
 def segment_respondents(
     satisfaction_scores: List[float],
     sentiment_scores: List[float],
-    categorical_features: Optional[List[Dict[str, Any]]] = None,
+    product_features: List[Dict[str, int]], # Wajib: One-Hot Encoding fitur/produk
+    demographics: Optional[List[Dict[str, Any]]] = None,
     k: Optional[int] = None,
     k_min: int = 2,
-    k_max: int = 10,
+    k_max: int = 8,
     random_state: int = 42,
 ) -> Dict[str, Any]:
     """
-    Segmentasi responden menggunakan K-Means clustering.
-    
-    Args:
-        satisfaction_scores: Skor kepuasan per responden
-        sentiment_scores: Skor sentimen per responden
-        categorical_features: Fitur kategorikal per responden (optional)
-        k: Jumlah cluster (optional, akan dicari optimal jika None)
-        k_min: Minimum K untuk pencarian optimal
-        k_max: Maximum K untuk pencarian optimal
-        random_state: Random state untuk reproducibility
-    
-    Returns:
-        Dict dengan hasil segmentasi
+    Segmentasi untuk mengetahui Pemetaan Produk per Segmen.
     """
-    df_features, X = _build_feature_matrix(
-        satisfaction_scores=satisfaction_scores,
-        sentiment_scores=sentiment_scores,
-        categorical_features=categorical_features,
-    )
-
+    
+    # 1. Build Data
+    df_features, X, product_cols = _build_feature_matrix(satisfaction_scores, sentiment_scores, product_features)
+    
+    # 2. Scaling (Agar Sentimen & Fitur Produk bobotnya seimbang)
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
-
-    k_analysis: Optional[Dict[str, Any]] = None
+    
+    # 3. Clustering (K-Means)
+    k_analysis = None
     if k is None:
-        k_analysis = _find_optimal_k(X_scaled, k_min=k_min, k_max=k_max, random_state=random_state)
-        if k_analysis["recommended_k"] is None:
-            k = max(k_min, 2)
+        # Simple Elbow/Silhouette
+        silhouettes = {}
+        for i in range(k_min, k_max + 1):
+            if len(X) <= i: break
+            km = KMeans(n_clusters=i, random_state=random_state, n_init="auto")
+            lbls = km.fit_predict(X_scaled)
+            silhouettes[i] = silhouette_score(X_scaled, lbls)
+        
+        if silhouettes:
+            k = max(silhouettes, key=silhouettes.get)
         else:
-            k = int(k_analysis["recommended_k"])
+            k = 3
+        k_analysis = {"best_k": k, "scores": silhouettes}
 
-    kmeans_final = KMeans(n_clusters=k, random_state=random_state, n_init="auto")
-    cluster_labels = kmeans_final.fit_predict(X_scaled)
-
+    kmeans = KMeans(n_clusters=k, random_state=random_state, n_init="auto")
+    cluster_labels = kmeans.fit_predict(X_scaled)
+    
     df_clustered = df_features.copy()
     df_clustered["cluster"] = cluster_labels
+    
+    # 4. Analisis Per Segmen (Product Affinity)
+    segments_profile = []
+    
+    for c_id in sorted(df_clustered['cluster'].unique()):
+        subset = df_clustered[df_clustered['cluster'] == c_id]
+        
+        # A. Hitung Rata-rata Kepuasan Segmen Ini
+        avg_sat = float(subset['satisfaction'].mean())
+        avg_sent = float(subset['sentiment'].mean())
+        
+        # B. Cari Produk/Fitur Yang Disukai Segmen Ini
+        liked_products = _analyze_cluster_affinity(subset, product_cols)
+        
+        # C. Auto Naming berdasarkan Produk Terfavorit
+        # Contoh nama: "Puas (0.8) - Pecinta [Produk A]"
+        if liked_products:
+            top_prod = liked_products[0]['product_name']
+            segment_name = f"Segmen {top_prod}"
+        else:
+            segment_name = f"Segmen {c_id}"
+            
+        # D. Profil Demografi (Jika ada)
+        demo_summary = {}
+        if demographics:
+            df_demo = pd.DataFrame(demographics)
+            # Gabung index biar pas
+            subset_demo = df_demo.iloc[subset.index] 
+            for col in df_demo.columns:
+                try:
+                    demo_summary[col] = subset_demo[col].mode()[0]
+                except: pass
 
-    cluster_summary = (
-        df_clustered.groupby("cluster")
-        .agg(["mean", "count"])
-        .to_dict()
-    )
+        segments_profile.append({
+            "cluster_id": int(c_id),
+            "label_name": segment_name,
+            "population_count": int(len(subset)),
+            "avg_satisfaction": round(avg_sat, 2),
+            "avg_sentiment": round(avg_sent, 2),
+            "preferred_products": liked_products, # <--- INI HASIL UTAMANYA
+            "demographics_mode": demo_summary
+        })
 
-    preference_summary: Dict[str, Any] = {}
-    if categorical_features:
-        cat_columns = list(pd.DataFrame(categorical_features).columns)
-        for cluster_id in sorted(df_clustered["cluster"].unique()):
-            subset = df_clustered[df_clustered["cluster"] == cluster_id]
-            freq = subset[cat_columns].mean().sort_values(ascending=False)
-            top_features = [
-                {"feature": feat, "score": float(score)}
-                for feat, score in freq.head(5).items()
-            ]
-            preference_summary[str(cluster_id)] = top_features
-
-    pca = PCA(n_components=2, random_state=random_state)
-    X_pca = pca.fit_transform(X_scaled)
-    pca_2d = [
-        {"x": float(x), "y": float(y), "cluster": int(c)}
-        for (x, y), c in zip(X_pca, cluster_labels)
+    # 5. Output Visualisasi Scatter Plot
+    pca = PCA(n_components=2)
+    coords = pca.fit_transform(X_scaled)
+    pca_data = [
+        {"x": float(c[0]), "y": float(c[1]), "cluster": int(l)} 
+        for c, l in zip(coords, cluster_labels)
     ]
 
     return {
-        "k_used": int(k),
-        "clusters": [int(c) for c in cluster_labels],
-        "k_analysis": k_analysis,
-        "cluster_summary": cluster_summary,
-        "preference_summary": preference_summary,
-        "pca_2d": pca_2d,
+        "k_used": k,
+        "segments": segments_profile,
+        "pca_plot": pca_data
     }
-
