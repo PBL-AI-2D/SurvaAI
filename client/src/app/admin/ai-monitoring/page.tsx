@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 export default function AdminAIMonitoringPage() {
   const [open, setOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState("Satisfaction Classifier");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Dummy data (wireframe)
   const kpis = [
@@ -113,13 +114,41 @@ export default function AdminAIMonitoringPage() {
     { text: "Automated retraining scheduled for next week", time: "Mar 05, 2025 11:09" },
   ];
 
+  const normalizedQuery = searchQuery.toLowerCase().trim();
+
+  const filteredModels = models.filter((m) => {
+    if (!normalizedQuery) return true;
+
+    return (
+      m.name.toLowerCase().includes(normalizedQuery) ||
+      m.version.toLowerCase().includes(normalizedQuery) ||
+      m.acc.toLowerCase().includes(normalizedQuery) ||
+      m.updated.toLowerCase().includes(normalizedQuery) ||
+      m.status.toLowerCase().includes(normalizedQuery)
+    );
+  });
+
+  const filteredLogs = logs.filter((l) => {
+    if (!normalizedQuery) return true;
+
+    return (
+      l.text.toLowerCase().includes(normalizedQuery) ||
+      l.time.toLowerCase().includes(normalizedQuery)
+    );
+  });
+
   return (
     <div className="p-6 space-y-6">
       {/* Top bar: search */}
       <div className="flex items-center gap-3">
         <div className="relative w-full max-w-xl">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-70" />
-          <Input placeholder="Search models, metrics, logs..." className="pl-9" />
+          <Input
+            placeholder="Search models, metrics, logs..."
+            className="pl-9"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
       </div>
 
@@ -198,7 +227,7 @@ export default function AdminAIMonitoringPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {models.map((m) => (
+                {filteredModels.map((m) => (
                   <TableRow
                     key={m.name}
                     className={cn(
@@ -269,7 +298,7 @@ export default function AdminAIMonitoringPage() {
             <CardTitle className="text-base">Notification Log</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {logs.map((l, i) => (
+            {filteredLogs.map((l, i) => (
               <div key={i} className="space-y-1">
                 <div className="flex items-start gap-2">
                   <div className={cn("h-2 w-2 rounded-full mt-2", i === 0 ? "bg-green-400" : "bg-muted-foreground/50")} />
