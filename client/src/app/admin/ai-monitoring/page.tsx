@@ -23,14 +23,36 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Search, TrendingUp, Upload } from "lucide-react";
-import { useState } from "react";
+import { Search, TrendingUp, Upload, Download, Filter, ArrowUpDown, X, BarChart3 } from "lucide-react";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function AdminAIMonitoringPage() {
   const [open, setOpen] = useState(false);
+  const [updatingModel, setUpdatingModel] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState("Satisfaction Classifier");
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [selectedModelsForComparison, setSelectedModelsForComparison] = useState<string[]>([]);
 
   // Dummy data (wireframe)
   const kpis = [
@@ -116,17 +138,62 @@ export default function AdminAIMonitoringPage() {
 
   const normalizedQuery = searchQuery.toLowerCase().trim();
 
-  const filteredModels = models.filter((m) => {
-    if (!normalizedQuery) return true;
+  // Helper function to parse accuracy percentage
+  const parseAccuracy = (acc: string): number => {
+    return parseFloat(acc.replace("%", ""));
+  };
 
-    return (
-      m.name.toLowerCase().includes(normalizedQuery) ||
-      m.version.toLowerCase().includes(normalizedQuery) ||
-      m.acc.toLowerCase().includes(normalizedQuery) ||
-      m.updated.toLowerCase().includes(normalizedQuery) ||
-      m.status.toLowerCase().includes(normalizedQuery)
-    );
-  });
+  // Helper function to parse date for sorting
+  const parseDate = (dateStr: string): Date => {
+    return new Date(dateStr);
+  };
+
+  // Filter and sort models
+  const filteredAndSortedModels = useMemo(() => {
+    let filtered = models.filter((m) => {
+      // Search filter
+      if (normalizedQuery) {
+        const matchesSearch =
+          m.name.toLowerCase().includes(normalizedQuery) ||
+          m.version.toLowerCase().includes(normalizedQuery) ||
+          m.acc.toLowerCase().includes(normalizedQuery) ||
+          m.updated.toLowerCase().includes(normalizedQuery) ||
+          m.status.toLowerCase().includes(normalizedQuery);
+        if (!matchesSearch) return false;
+      }
+
+      // Status filter
+      if (statusFilter !== "all" && m.status.toLowerCase() !== statusFilter.toLowerCase()) {
+        return false;
+      }
+
+      return true;
+    });
+
+    // Sort models
+    filtered = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case "name":
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case "accuracy":
+          comparison = parseAccuracy(a.acc) - parseAccuracy(b.acc);
+          break;
+        case "date":
+          comparison = parseDate(a.updated).getTime() - parseDate(b.updated).getTime();
+          break;
+        case "version":
+          comparison = a.version.localeCompare(b.version);
+          break;
+        default:
+          comparison = 0;
+      }
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+
+    return filtered;
+  }, [models, normalizedQuery, statusFilter, sortBy, sortOrder]);
 
   const filteredLogs = logs.filter((l) => {
     if (!normalizedQuery) return true;
@@ -137,10 +204,73 @@ export default function AdminAIMonitoringPage() {
     );
   });
 
+  // Export to CSV function
+  const exportToCSV = () => {
+    const headers = ["Model Name", "Version", "Accuracy", "Last Updated", "Status"];
+    const rows = filteredAndSortedModels.map((m) => [
+      m.name,
+      m.version,
+      m.acc,
+      m.updated,
+      m.status,
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `ai-models-${new Date().toISOString().split("T")[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Toggle model selection for comparison
+  const toggleModelComparison = (modelName: string) => {
+    setSelectedModelsForComparison((prev) =>
+      prev.includes(modelName)
+        ? prev.filter((name) => name !== modelName)
+        : [...prev, modelName]
+    );
+  };
+
+  // Get comparison data
+  const comparisonData = useMemo(() => {
+    if (selectedModelsForComparison.length === 0) return [];
+    
+    const maxIterations = Math.max(
+      ...selectedModelsForComparison.map(
+        (name) => trendByModel[name]?.length || 0
+      )
+    );
+
+    const data: { iter: string; [key: string]: string | number }[] = [];
+    for (let i = 0; i < maxIterations; i++) {
+      const entry: { iter: string; [key: string]: string | number } = {
+        iter: `Iter ${i + 1}`,
+      };
+      selectedModelsForComparison.forEach((modelName) => {
+        const trend = trendByModel[modelName];
+        if (trend && trend[i]) {
+          entry[`${modelName} - Accuracy`] = trend[i].accuracy;
+          entry[`${modelName} - F1`] = trend[i].f1;
+        }
+      });
+      data.push(entry);
+    }
+    return data;
+  }, [selectedModelsForComparison]);
+
   return (
     <div className="p-6 space-y-6">
-      {/* Top bar: search */}
-      <div className="flex items-center gap-3">
+      {/* Top bar: search and actions */}
+      <div className="flex items-center gap-3 flex-wrap">
         <div className="relative w-full max-w-xl">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-70" />
           <Input
@@ -149,6 +279,112 @@ export default function AdminAIMonitoringPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <Dialog open={comparisonOpen} onOpenChange={setComparisonOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Compare Models
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Model Comparison & Benchmarking</DialogTitle>
+                <DialogDescription>
+                  Select multiple models to compare their performance metrics side by side.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="border rounded-lg p-4">
+                  <h4 className="text-sm font-medium mb-3">Select Models to Compare</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {models.map((m) => (
+                      <div key={m.name} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`compare-${m.name}`}
+                          checked={selectedModelsForComparison.includes(m.name)}
+                          onCheckedChange={() => toggleModelComparison(m.name)}
+                        />
+                        <label
+                          htmlFor={`compare-${m.name}`}
+                          className="text-sm cursor-pointer flex-1"
+                        >
+                          {m.name}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {selectedModelsForComparison.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="border rounded-lg p-4">
+                      <h4 className="text-sm font-medium mb-3">Performance Comparison</h4>
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={comparisonData} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="iter" />
+                            <YAxis domain={[70, 100]} />
+                            <Tooltip />
+                            <Legend />
+                            {selectedModelsForComparison.map((modelName, idx) => {
+                              const colors = ["#2563eb", "#22c55e", "#eab308", "#ef4444", "#8b5cf6", "#f97316"];
+                              return (
+                                <Line
+                                  key={`${modelName}-accuracy`}
+                                  type="monotone"
+                                  dataKey={`${modelName} - Accuracy`}
+                                  stroke={colors[idx % colors.length]}
+                                  strokeWidth={2}
+                                  dot={false}
+                                />
+                              );
+                            })}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                    <div className="border rounded-lg p-4">
+                      <h4 className="text-sm font-medium mb-3">Metrics Summary</h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Model</TableHead>
+                            <TableHead>Accuracy</TableHead>
+                            <TableHead>Version</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedModelsForComparison.map((modelName) => {
+                            const model = models.find((m) => m.name === modelName);
+                            if (!model) return null;
+                            return (
+                              <TableRow key={modelName}>
+                                <TableCell className="font-medium">{model.name}</TableCell>
+                                <TableCell>{model.acc}</TableCell>
+                                <TableCell>{model.version}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="border-green-500/40 text-green-400">
+                                    {model.status}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Button variant="outline" size="sm" onClick={exportToCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
         </div>
       </div>
 
@@ -213,6 +449,43 @@ export default function AdminAIMonitoringPage() {
         <Card className="xl:col-span-2 bg-muted/30 border-muted-foreground/20">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Deployed Models</CardTitle>
+            <div className="flex items-center gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[140px] h-8">
+                  <div className="flex items-center">
+                    <Filter className="h-3 w-3 mr-2" />
+                    <SelectValue placeholder="Filter status" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[140px] h-8">
+                  <div className="flex items-center">
+                    <ArrowUpDown className="h-3 w-3 mr-2" />
+                    <SelectValue placeholder="Sort by" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Name</SelectItem>
+                  <SelectItem value="accuracy">Accuracy</SelectItem>
+                  <SelectItem value="date">Last Updated</SelectItem>
+                  <SelectItem value="version">Version</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                className="h-8"
+              >
+                {sortOrder === "asc" ? "↑" : "↓"}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -227,7 +500,14 @@ export default function AdminAIMonitoringPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredModels.map((m) => (
+                {filteredAndSortedModels.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                      No models found matching your filters.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredAndSortedModels.map((m) => (
                   <TableRow
                     key={m.name}
                     className={cn(
@@ -246,22 +526,35 @@ export default function AdminAIMonitoringPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Drawer open={open} onOpenChange={setOpen}>
+                      <Drawer open={open && updatingModel === m.name} onOpenChange={(isOpen) => {
+                        setOpen(isOpen);
+                        if (!isOpen) setUpdatingModel(null);
+                      }}>
                         <DrawerTrigger asChild>
-                          <Button size="sm" variant="secondary">Update Model</Button>
+                          <Button 
+                            size="sm" 
+                            variant="secondary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setUpdatingModel(m.name);
+                              setOpen(true);
+                            }}
+                          >
+                            Update Model
+                          </Button>
                         </DrawerTrigger>
                         <DrawerContent className="p-0">
                           <DrawerHeader className="px-6 py-4">
-                            <DrawerTitle>Update Model</DrawerTitle>
+                            <DrawerTitle>Update Model: {m.name}</DrawerTitle>
                           </DrawerHeader>
                           <div className="px-6 pb-6 space-y-6">
                             {/* Model Type */}
                             <div>
                               <label className="text-sm text-muted-foreground">Model Type</label>
                               <div className="mt-2">
-                                <select className="w-full rounded-md border bg-background px-3 py-2 text-sm">
-                                  {models.map((m) => (
-                                    <option key={m.name}>{m.name}</option>
+                                <select className="w-full rounded-md border bg-background px-3 py-2 text-sm" defaultValue={m.name}>
+                                  {models.map((model) => (
+                                    <option key={model.name} value={model.name}>{model.name}</option>
                                   ))}
                                 </select>
                               </div>
@@ -286,7 +579,8 @@ export default function AdminAIMonitoringPage() {
                       </Drawer>
                     </TableCell>
                   </TableRow>
-                ))}
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
