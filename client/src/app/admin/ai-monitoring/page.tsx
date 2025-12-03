@@ -39,14 +39,62 @@ export default function AdminAIMonitoringPage() {
     { label: "F1 Score", value: "92.8%", badge: "Excellent" },
   ];
 
-  const trend = [
-    { iter: "Iter 1", accuracy: 81, f1: 80, precision: 82, recall: 79 },
-    { iter: "Iter 2", accuracy: 85, f1: 84, precision: 85, recall: 83 },
-    { iter: "Iter 3", accuracy: 87, f1: 86, precision: 87, recall: 86 },
-    { iter: "Iter 4", accuracy: 88, f1: 88, precision: 88, recall: 87 },
-    { iter: "Iter 5", accuracy: 90, f1: 89, precision: 90, recall: 89 },
-    { iter: "Iter 6", accuracy: 92, f1: 92, precision: 92, recall: 91 },
-  ];
+  // Dummy trend data untuk masing-masing model
+  const trendByModel: Record<
+    string,
+    { iter: string; accuracy: number; f1: number; precision: number; recall: number }[]
+  > = {
+    "Satisfaction Classifier": [
+      { iter: "Iter 1", accuracy: 81, f1: 80, precision: 82, recall: 79 },
+      { iter: "Iter 2", accuracy: 85, f1: 84, precision: 85, recall: 83 },
+      { iter: "Iter 3", accuracy: 87, f1: 86, precision: 87, recall: 86 },
+      { iter: "Iter 4", accuracy: 88, f1: 88, precision: 88, recall: 87 },
+      { iter: "Iter 5", accuracy: 90, f1: 89, precision: 90, recall: 89 },
+      { iter: "Iter 6", accuracy: 92, f1: 92, precision: 92, recall: 91 },
+    ],
+    "Preference Segmentation": [
+      { iter: "Iter 1", accuracy: 75, f1: 73, precision: 78, recall: 70 },
+      { iter: "Iter 2", accuracy: 80, f1: 78, precision: 82, recall: 76 },
+      { iter: "Iter 3", accuracy: 83, f1: 82, precision: 84, recall: 81 },
+      { iter: "Iter 4", accuracy: 85, f1: 84, precision: 86, recall: 83 },
+      { iter: "Iter 5", accuracy: 87, f1: 86, precision: 88, recall: 85 },
+      { iter: "Iter 6", accuracy: 89, f1: 88, precision: 90, recall: 87 },
+    ],
+    "Sentiment Analysis": [
+      { iter: "Iter 1", accuracy: 88, f1: 87, precision: 89, recall: 86 },
+      { iter: "Iter 2", accuracy: 90, f1: 89, precision: 91, recall: 88 },
+      { iter: "Iter 3", accuracy: 92, f1: 91, precision: 93, recall: 90 },
+      { iter: "Iter 4", accuracy: 93, f1: 93, precision: 94, recall: 92 },
+      { iter: "Iter 5", accuracy: 94, f1: 94, precision: 95, recall: 93 },
+      { iter: "Iter 6", accuracy: 95, f1: 95, precision: 96, recall: 94 },
+    ],
+    "Response Quality Filter": [
+      { iter: "Iter 1", accuracy: 78, f1: 77, precision: 79, recall: 76 },
+      { iter: "Iter 2", accuracy: 80, f1: 79, precision: 81, recall: 78 },
+      { iter: "Iter 3", accuracy: 82, f1: 81, precision: 83, recall: 80 },
+      { iter: "Iter 4", accuracy: 84, f1: 83, precision: 85, recall: 82 },
+      { iter: "Iter 5", accuracy: 86, f1: 85, precision: 87, recall: 84 },
+      { iter: "Iter 6", accuracy: 87, f1: 87, precision: 88, recall: 86 },
+    ],
+    "Churn Predictor": [
+      { iter: "Iter 1", accuracy: 82, f1: 81, precision: 83, recall: 80 },
+      { iter: "Iter 2", accuracy: 84, f1: 83, precision: 85, recall: 82 },
+      { iter: "Iter 3", accuracy: 86, f1: 85, precision: 87, recall: 84 },
+      { iter: "Iter 4", accuracy: 88, f1: 87, precision: 89, recall: 86 },
+      { iter: "Iter 5", accuracy: 89, f1: 89, precision: 90, recall: 88 },
+      { iter: "Iter 6", accuracy: 90, f1: 90, precision: 91, recall: 89 },
+    ],
+    "Engagement Ranker": [
+      { iter: "Iter 1", accuracy: 79, f1: 78, precision: 80, recall: 77 },
+      { iter: "Iter 2", accuracy: 81, f1: 80, precision: 82, recall: 79 },
+      { iter: "Iter 3", accuracy: 83, f1: 82, precision: 84, recall: 81 },
+      { iter: "Iter 4", accuracy: 85, f1: 84, precision: 86, recall: 83 },
+      { iter: "Iter 5", accuracy: 87, f1: 86, precision: 88, recall: 85 },
+      { iter: "Iter 6", accuracy: 88, f1: 88, precision: 89, recall: 87 },
+    ],
+  };
+
+  const trend = trendByModel[selectedModel] ?? trendByModel["Satisfaction Classifier"];
 
   const models = [
     { name: "Satisfaction Classifier", version: "v2.4.1", acc: "92.8%", updated: "Mar 18, 2025", status: "Active" },
@@ -96,7 +144,10 @@ export default function AdminAIMonitoringPage() {
       {/* Trend chart + dropdown */}
       <Card className="bg-muted/30 border-muted-foreground/20">
         <CardHeader className="flex items-center justify-between">
-          <CardTitle className="text-base text-muted-foreground">Model Performance Trend</CardTitle>
+          <CardTitle className="text-base text-muted-foreground">
+            Model Performance Trend{" "}
+            <span className="font-semibold text-foreground">({selectedModel})</span>
+          </CardTitle>
 
           {/* Dropdown di kanan */}
           <select
@@ -148,7 +199,14 @@ export default function AdminAIMonitoringPage() {
               </TableHeader>
               <TableBody>
                 {models.map((m) => (
-                  <TableRow key={m.name}>
+                  <TableRow
+                    key={m.name}
+                    className={cn(
+                      "cursor-pointer",
+                      selectedModel === m.name && "bg-muted"
+                    )}
+                    onClick={() => setSelectedModel(m.name)}
+                  >
                     <TableCell className="font-medium">{m.name}</TableCell>
                     <TableCell>{m.version}</TableCell>
                     <TableCell>{m.acc}</TableCell>
