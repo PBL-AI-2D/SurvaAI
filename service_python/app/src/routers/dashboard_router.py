@@ -1,11 +1,11 @@
 from fastapi import APIRouter
 
-from service_python.app.src.schemas.dashboard import (
+from ..schemas.dashboard import (
     DashboardRequest,
     DashboardResponse,
     DashboardData,
 )
-from service_python.app.src.services.dashboard_service import generate_dashboard_data
+from ..services.dashboard_service import generate_dashboard_data
 
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])

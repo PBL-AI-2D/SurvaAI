@@ -6,8 +6,18 @@ import torch
 import torch.nn.functional as F
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-BASE_DIR = Path(__file__).resolve().parents[3]
+# Get base directory - go up from app/src/services/ to service_python/
+_current_file = Path(__file__).resolve()
+BASE_DIR = _current_file.parent.parent.parent.parent  # app/src/services -> service_python
 CONFIG_PATH = BASE_DIR / "ai_models" / "sentiment_analysis_config.json"
+
+# Fallback: try current working directory if path doesn't exist
+if not CONFIG_PATH.exists():
+    cwd = Path.cwd()
+    if (cwd / "ai_models" / "sentiment_analysis_config.json").exists():
+        CONFIG_PATH = cwd / "ai_models" / "sentiment_analysis_config.json"
+    elif (cwd.parent / "ai_models" / "sentiment_analysis_config.json").exists():
+        CONFIG_PATH = cwd.parent / "ai_models" / "sentiment_analysis_config.json"
 
 with CONFIG_PATH.open() as f:
     config = json.load(f)

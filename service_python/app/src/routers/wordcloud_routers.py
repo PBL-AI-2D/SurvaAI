@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Response
 from fastapi.responses import StreamingResponse
-from service_python.app.src.schemas.wordcloud import WordCloudInput
-from service_python.app.src.services.wordcloud_service import generate_wordcloud_image
+from ..schemas.wordcloud import WordCloudInput
+from ..services.wordcloud_service import generate_wordcloud_image
 import io
 
 router = APIRouter(prefix="/wordcloud", tags=["WordCloud"])

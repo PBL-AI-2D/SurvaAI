@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from service_python.app.src.config import settings
-from service_python.app.src.routers import sentiment_analysis_router
-from service_python.app.src.routers import wordcloud_routers
-from service_python.app.src.routers import preference_analysis_router
-from service_python.app.src.routers import satisfaction_analysis_router
-from service_python.app.src.routers import dashboard_router
-from service_python.app.src.routers import forecasting_router
+from .config import settings
+from .routers import sentiment_analysis_router
+from .routers import wordcloud_routers
+from .routers import preference_analysis_router
+from .routers import satisfaction_analysis_router
+from .routers import dashboard_router
+from .routers import forecasting_router
 
 app = FastAPI(title=settings.app_name)
 

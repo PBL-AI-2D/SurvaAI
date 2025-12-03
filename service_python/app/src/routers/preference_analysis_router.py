@@ -1,10 +1,10 @@
 from fastapi import APIRouter
 
-from service_python.app.src.schemas.preference_analysis import (
+from ..schemas.preference_analysis import (
     SegmentationRequest,
     SegmentationResponse,
 )
-from service_python.app.src.services.segmentation_service import segment_respondents
+from ..services.segmentation_service import segment_respondents
 
 
 router = APIRouter(prefix="/preferences", tags=["Preferences & Segmentation"])

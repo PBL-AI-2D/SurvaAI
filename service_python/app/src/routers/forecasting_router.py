@@ -1,11 +1,11 @@
 from fastapi import APIRouter
 
-from service_python.app.src.schemas.forecasting import (
+from ..schemas.forecasting import (
     ForecastingRequest,
     ForecastingResponse,
     ForecastingResult,
 )
-from service_python.app.src.services.forecasting_service import forecast_eti_trend
+from ..services.forecasting_service import forecast_eti_trend
 
 
 router = APIRouter(prefix="/forecasting", tags=["Forecasting & ETI"])

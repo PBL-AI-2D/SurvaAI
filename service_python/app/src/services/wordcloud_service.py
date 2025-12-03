@@ -1,10 +1,15 @@
 import json
 import io
 import re
+from pathlib import Path
 from typing import List
 from wordcloud import WordCloud
 
-with open("service_python/app/data/stopwords-id.json", "r", encoding="utf-8") as f:
+# Get the path to stopwords file relative to this file
+_current_file = Path(__file__).resolve()
+_stopwords_path = _current_file.parent.parent.parent / "data" / "stopwords-id.json"
+
+with open(_stopwords_path, "r", encoding="utf-8") as f:
     stopwords = set(json.load(f))
 
 def preprocess(text: str) -> str:

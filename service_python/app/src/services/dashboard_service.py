@@ -2,30 +2,15 @@ from typing import List, Dict, Any, Optional
 import numpy as np
 import pandas as pd
 
-# Import services dengan fallback untuk berbagai konteks
+# Import services dengan relative import
+from .satisfaction_analysis_service import analyze_satisfaction
+from .segmentation_service import segment_respondents
+from .eti_service import calculate_eti_score, predict_trend_from_eti
 try:
-    from service_python.app.src.services.satisfaction_analysis_service import analyze_satisfaction
-    from service_python.app.src.services.segmentation_service import segment_respondents
-    from service_python.app.src.services.eti_service import calculate_eti_score, predict_trend_from_eti
-    from service_python.app.src.services.recommendation_service import generate_recommendations
+    from .recommendation_service import generate_recommendations
 except ImportError:
-    try:
-        from app.src.services.satisfaction_analysis_service import analyze_satisfaction
-        from app.src.services.segmentation_service import segment_respondents
-        from app.src.services.eti_service import calculate_eti_score, predict_trend_from_eti
-        from app.src.services.recommendation_service import generate_recommendations
-    except ImportError:
-        # Fallback untuk relative import jika diperlukan
-        import sys
-        from pathlib import Path
-        current_file = Path(__file__).resolve()
-        service_dir = current_file.parent
-        if str(service_dir.parent.parent) not in sys.path:
-            sys.path.insert(0, str(service_dir.parent.parent))
-        from app.src.services.satisfaction_analysis_service import analyze_satisfaction
-        from app.src.services.segmentation_service import segment_respondents
-        from app.src.services.eti_service import calculate_eti_score, predict_trend_from_eti
-        from app.src.services.recommendation_service import generate_recommendations
+    # Fallback jika recommendation_service tidak ada
+    generate_recommendations = None
 
 
 def _calculate_satisfaction_percentage(sentiment_dist: Dict[str, int], total: int) -> Dict[str, float]:
@@ -44,6 +29,45 @@ def _calculate_satisfaction_percentage(sentiment_dist: Dict[str, int], total: in
     }
 
 
+def _convert_categorical_to_product_features(
+    categorical_features: List[Dict[str, Any]]
+) -> List[Dict[str, int]]:
+    """
+    Konversi categorical features menjadi product_features format One-Hot Encoding.
+    Format output: List[Dict[str, int]] dimana setiap dict adalah one-hot untuk satu responden.
+    """
+    if not categorical_features:
+        return []
+    
+    df_cat = pd.DataFrame(categorical_features)
+    # Fill NaN values
+    df_cat = df_cat.fillna(0)
+    # Infer object types to avoid downcasting warning
+    df_cat = df_cat.infer_objects(copy=False)
+    # Convert object columns to numeric if possible, otherwise keep as is
+    for col in df_cat.columns:
+        try:
+            df_cat[col] = pd.to_numeric(df_cat[col])
+        except (TypeError, ValueError):
+            # Keep as is if conversion fails
+            pass
+    
+    # Konversi semua kolom menjadi integer (0 atau 1 untuk one-hot)
+    product_features = []
+    for idx in range(len(df_cat)):
+        row_dict = {}
+        for col in df_cat.columns:
+            val = df_cat.iloc[idx][col]
+            # Konversi ke 0 atau 1
+            if pd.isna(val) or val == 0 or val == False or val == "":
+                row_dict[str(col)] = 0  # Convert column name to string
+            else:
+                row_dict[str(col)] = 1  # Convert column name to string
+        product_features.append(row_dict)
+    
+    return product_features
+
+
 def _extract_preference_from_categorical(
     categorical_features: List[Dict[str, Any]]
 ) -> Dict[str, float]:
@@ -57,10 +81,12 @@ def _extract_preference_from_categorical(
     df_cat = pd.DataFrame(categorical_features)
     
     # Cari kolom yang kemungkinan adalah preferensi produk
-    preference_cols = [
-        col for col in df_cat.columns
-        if any(keyword in col.lower() for keyword in ['product', 'prefer', 'like', 'choose'])
-    ]
+    # Handle both string and integer column names
+    preference_cols = []
+    for col in df_cat.columns:
+        col_str = str(col).lower()  # Convert to string first
+        if any(keyword in col_str for keyword in ['product', 'prefer', 'like', 'choose']):
+            preference_cols.append(col)
     
     if not preference_cols:
         return {}
@@ -68,10 +94,14 @@ def _extract_preference_from_categorical(
     # Hitung rata-rata (frekuensi) per preferensi
     preference_scores = {}
     for col in preference_cols:
-        avg_score = df_cat[col].mean()
-        if avg_score > 0:
-            # Normalisasi ke persentase (asumsi one-hot encoding)
-            preference_scores[col] = round(avg_score * 100, 1)
+        try:
+            avg_score = df_cat[col].mean()
+            if avg_score > 0:
+                # Normalisasi ke persentase (asumsi one-hot encoding)
+                preference_scores[str(col)] = round(avg_score * 100, 1)
+        except (TypeError, ValueError):
+            # Skip kolom yang tidak bisa dihitung mean-nya
+            continue
     
     # Sort by score descending
     sorted_prefs = dict(sorted(preference_scores.items(), key=lambda x: x[1], reverse=True))
@@ -135,11 +165,13 @@ def _calculate_segment_details(
             cluster_cat = cat_df[cat_df["cluster"] == cluster_id]
             
             # Cari kolom preferensi dengan nilai tertinggi
-            pref_cols = [
-                col for col in cluster_cat.columns
-                if col != "cluster" and any(keyword in col.lower() 
-                    for keyword in ['product', 'prefer', 'like', 'choose'])
-            ]
+            pref_cols = []
+            for col in cluster_cat.columns:
+                if col == "cluster":
+                    continue
+                col_str = str(col).lower()  # Convert to string first
+                if any(keyword in col_str for keyword in ['product', 'prefer', 'like', 'choose']):
+                    pref_cols.append(col)
             
             if pref_cols:
                 pref_scores = cluster_cat[pref_cols].mean().sort_values(ascending=False)
@@ -197,19 +229,44 @@ def generate_dashboard_data(
         likert_max=likert_max,
     )
     
-    satisfaction_scores = ai1_result["overall_satisfaction_scores"]
+    satisfaction_scores = ai1_result.get("final_satisfaction_scores", [])
     sentiment_scores = [
         s if s is not None else 0.5
-        for s in ai1_result["sentiment_scores"]
+        for s in ai1_result.get("sentiment_scores", [])
     ]
-    sentiment_dist = ai1_result["sentiment_distribution"]
+    # Ensure sentiment_distribution always has the correct structure
+    sentiment_dist_raw = ai1_result.get("sentiment_distribution", {})
+    if not isinstance(sentiment_dist_raw, dict):
+        sentiment_dist = {"positive": 0, "negative": 0, "neutral": 0}
+    else:
+        sentiment_dist = {
+            "positive": int(sentiment_dist_raw.get("positive", 0)),
+            "negative": int(sentiment_dist_raw.get("negative", 0)),
+            "neutral": int(sentiment_dist_raw.get("neutral", 0)),
+        }
+    
+    # Jika sentiment_distribution kosong (semua 0), gunakan satisfaction_scores sebagai fallback
+    total_sentiment = sentiment_dist["positive"] + sentiment_dist["negative"] + sentiment_dist["neutral"]
+    if total_sentiment == 0 and satisfaction_scores:
+        # Hitung distribusi sentimen berdasarkan satisfaction scores
+        # Score > 0.7 = positive, < 0.3 = negative, else = neutral
+        for score in satisfaction_scores:
+            if score > 0.7:
+                sentiment_dist["positive"] += 1
+            elif score < 0.3:
+                sentiment_dist["negative"] += 1
+            else:
+                sentiment_dist["neutral"] += 1
     categorical_features = [r.get("categorical", {}) for r in responses]
+    
+    # Konversi categorical_features ke product_features (One-Hot Encoding)
+    product_features = _convert_categorical_to_product_features(categorical_features)
     
     # 2. Jalankan AI-2: Segmentasi
     ai2_result = segment_respondents(
         satisfaction_scores=satisfaction_scores,
         sentiment_scores=sentiment_scores,
-        categorical_features=categorical_features,
+        product_features=product_features,
         k=k,
         k_min=k_min,
         k_max=k_max,
@@ -229,12 +286,16 @@ def generate_dashboard_data(
         major_preference = list(all_preferences.keys())[0]
         major_preference_pct = all_preferences[major_preference]
     
+    # Extract cluster labels dari pca_plot
+    pca_plot = ai2_result.get("pca_plot", [])
+    clusters = [point.get("cluster", 0) for point in pca_plot] if pca_plot else []
+    
     # Segment dengan highest satisfaction
     segment_details = _calculate_segment_details(
-        clusters=ai2_result["clusters"],
+        clusters=clusters,
         satisfaction_scores=satisfaction_scores,
         categorical_features=categorical_features,
-        pca_2d=ai2_result["pca_2d"],
+        pca_2d=pca_plot,
     )
     
     highest_segment = None
@@ -270,11 +331,12 @@ def generate_dashboard_data(
         
         # AI Respondent Segmentation
         "segmentation": {
-            "total_segments": ai2_result["k_used"],
-            "clusters": ai2_result["clusters"],
-            "pca_2d": ai2_result["pca_2d"],
+            "total_segments": ai2_result.get("k_used", 0),
+            "clusters": clusters,
+            "pca_2d": pca_plot,
             "segment_details": segment_details,
             "k_analysis": ai2_result.get("k_analysis"),
+            "segments": ai2_result.get("segments", []),
         },
         
         # Dashboard Analytic Overview
@@ -291,9 +353,9 @@ def generate_dashboard_data(
         "chart_data": {
             "satisfaction_scores": satisfaction_scores,
             "sentiment_scores": sentiment_scores,
-            "sentiment_labels": ai1_result["sentiment_labels"],
-            "likert_normalized": ai1_result["likert_normalized"],
-            "likert_correlation": ai1_result.get("likert_correlation", {}),
+            "sentiment_labels": ai1_result.get("sentiment_labels", []),
+            "likert_normalized": ai1_result.get("details", {}).get("likert_normalized", []),
+            "likert_correlation": ai1_result.get("correlations", {}),
         },
     }
     

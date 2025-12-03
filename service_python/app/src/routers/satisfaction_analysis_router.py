@@ -1,11 +1,11 @@
 from fastapi import APIRouter
 
-from service_python.app.src.schemas.satisfaction_analysis import (
+from ..schemas.satisfaction_analysis import (
     SatisfactionRequest,
     SatisfactionAPIResponse,
     SatisfactionAnalysisResult,
 )
-from service_python.app.src.services.satisfaction_analysis_service import analyze_satisfaction
+from ..services.satisfaction_analysis_service import analyze_satisfaction
 
 
 router = APIRouter(prefix="/satisfaction", tags=["Satisfaction & Preferences"])

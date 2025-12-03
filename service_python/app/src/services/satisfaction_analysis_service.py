@@ -21,12 +21,9 @@ if (_project_root / "ai_models").exists() and (_project_root / "app").exists():
     os.chdir(str(_project_root))
 
 try:
-    from service_python.app.src.services.sentiment_analysis_service import predict_single
+    from .sentiment_analysis_service import predict_single
 except Exception:
-    try:
-        from app.src.services.sentiment_analysis_service import predict_single
-    except Exception:
-        pass # Handle import manual jika perlu
+    pass # Handle import manual jika perlu
 finally:
     try:
         os.chdir(_original_cwd)
