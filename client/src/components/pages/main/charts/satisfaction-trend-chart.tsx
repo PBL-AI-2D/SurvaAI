@@ -10,20 +10,34 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { WeeklySatisfactionData } from "@/features/survey/utils/chart-data-processor";
 
-const data = [
-  { week: "Week 1", productX: 70, productY: 60, productZ: 55 },
-  { week: "Week 2", productX: 72, productY: 62, productZ: 56 },
-  { week: "Week 3", productX: 75, productY: 64, productZ: 55 },
-  { week: "Week 4", productX: 78, productY: 65, productZ: 55 },
-];
+interface SatisfactionTrendChartProps {
+  data?: WeeklySatisfactionData[];
+  isLoading?: boolean;
+}
 
-export function SatisfactionTrendChart() {
+export function SatisfactionTrendChart({ data, isLoading }: SatisfactionTrendChartProps) {
+  const chartData = data || [
+    { week: "Week 1", satisfaction: 0 },
+    { week: "Week 2", satisfaction: 0 },
+    { week: "Week 3", satisfaction: 0 },
+    { week: "Week 4", satisfaction: 0 },
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="h-64 w-full flex items-center justify-center">
+        <div className="text-sm text-muted-foreground">Loading chart data...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
-          data={data}
+          data={chartData}
           margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -41,7 +55,7 @@ export function SatisfactionTrendChart() {
             ticks={[0, 25, 50, 75, 100]}
           />
           <Tooltip
-            formatter={(value: number, name: string) => [`${value}%`, name]}
+            formatter={(value: number) => [`${value}%`, "Satisfaction"]}
             labelStyle={{ color: "#374151", fontWeight: "500" }}
             contentStyle={{
               backgroundColor: "#fff",
@@ -58,30 +72,12 @@ export function SatisfactionTrendChart() {
           />
           <Line
             type="monotone"
-            dataKey="productX"
+            dataKey="satisfaction"
             stroke="var(--color-primary-1)"
             strokeWidth={3}
             dot={{ fill: "var(--color-primary-1)", strokeWidth: 2, r: 4 }}
             activeDot={{ r: 6, stroke: "var(--color-primary-1)", strokeWidth: 2 }}
-            name="Product X"
-          />
-          <Line
-            type="monotone"
-            dataKey="productY"
-            stroke="var(--color-primary-2)"
-            strokeWidth={3}
-            dot={{ fill: "var(--color-primary-2)", strokeWidth: 2, r: 4 }}
-            activeDot={{ r: 6, stroke: "var(--color-primary-2)", strokeWidth: 2 }}
-            name="Product Y"
-          />
-          <Line
-            type="monotone"
-            dataKey="productZ"
-            stroke="var(--color-primary-3)"
-            strokeWidth={3}
-            dot={{ fill: "var(--color-primary-3)", strokeWidth: 2, r: 4 }}
-            activeDot={{ r: 6, stroke: "var(--color-primary-3)", strokeWidth: 2 }}
-            name="Product Z"
+            name="Satisfaction %"
           />
         </LineChart>
       </ResponsiveContainer>

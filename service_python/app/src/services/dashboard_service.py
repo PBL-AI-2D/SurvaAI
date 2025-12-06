@@ -40,10 +40,9 @@ def _convert_categorical_to_product_features(
         return []
     
     df_cat = pd.DataFrame(categorical_features)
-    # Fill NaN values
-    df_cat = df_cat.fillna(0)
-    # Infer object types to avoid downcasting warning
-    df_cat = df_cat.infer_objects(copy=False)
+    # Fill NaN values and infer objects to avoid FutureWarning about downcasting
+    # Use infer_objects before fillna to prevent downcasting warning
+    df_cat = df_cat.infer_objects(copy=False).fillna(0)
     # Convert object columns to numeric if possible, otherwise keep as is
     for col in df_cat.columns:
         try:
@@ -275,6 +274,13 @@ def generate_dashboard_data(
     # 3. Aggregate data untuk dashboard
     total_respondents = len(responses)
     
+    # Kumpulkan semua text responses untuk analisis
+    all_text_responses = []
+    for r in responses:
+        text = r.get("text", "")
+        if text and isinstance(text, str) and text.strip():
+            all_text_responses.append(text.strip())
+    
     # AI Insight Summary
     satisfaction_pct = _calculate_satisfaction_percentage(sentiment_dist, total_respondents)
     
@@ -356,6 +362,12 @@ def generate_dashboard_data(
             "sentiment_labels": ai1_result.get("sentiment_labels", []),
             "likert_normalized": ai1_result.get("details", {}).get("likert_normalized", []),
             "likert_correlation": ai1_result.get("correlations", {}),
+        },
+        
+        # Text responses untuk Word Cloud dan analisis
+        "text_analysis": {
+            "all_text_responses": all_text_responses,
+            "total_text_responses": len(all_text_responses),
         },
     }
     

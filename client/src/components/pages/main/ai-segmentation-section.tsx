@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { ScatterPlotChart } from "./charts/scatter-plot-chart";
 import { SegmentationTable } from "./segmentation-table";
 import { FilterDropdowns } from "./filter-dropdowns";
+import { useSurveySatisfactionAnalysis } from "@/features/survey/hooks/useSurveySatisfactionAnalysis";
+import { useUserSurvey } from "@/features/survey/hooks/useUserSurveys";
 
 interface AISegmentationSectionProps {
   readonly surveyId: string;
@@ -13,6 +15,30 @@ interface AISegmentationSectionProps {
 export function AISegmentationSection({
   surveyId,
 }: AISegmentationSectionProps) {
+  // Fetch survey data untuk cek apakah ada responden
+  const { data: survey } = useUserSurvey(surveyId);
+  const hasRespondents = survey && survey.jumlah_responden > 0;
+
+  // Fetch analisis kepuasan untuk segmentation data
+  const {
+    data: satisfactionData,
+    isLoading: isLoadingSatisfaction,
+    isError: isErrorSatisfaction,
+  } = useSurveySatisfactionAnalysis(surveyId, hasRespondents);
+
+  // Generate AI Summary dari data real
+  const aiSummary = satisfactionData?.segments && satisfactionData.segments.length > 0
+    ? (() => {
+        const highestSegment = satisfactionData.segments.reduce((max, seg) =>
+          seg.satisfaction_percentage > max.satisfaction_percentage ? seg : max
+        );
+        const lowestSegment = satisfactionData.segments.reduce((min, seg) =>
+          seg.satisfaction_percentage < min.satisfaction_percentage ? seg : min
+        );
+        return `Respondents in Segment ${highestSegment.segment_id}${highestSegment.avg_age ? ` (average age ${highestSegment.avg_age})` : ''}${highestSegment.dominant_preference ? ` tend to prefer ${highestSegment.dominant_preference}` : ''} with significantly higher satisfaction rates (${highestSegment.satisfaction_percentage.toFixed(1)}%). This segment represents the most engaged and satisfied user base. Segment ${lowestSegment.segment_id} shows lower satisfaction (${lowestSegment.satisfaction_percentage.toFixed(1)}%) and may require targeted improvements.`;
+      })()
+    : "AI segmentation analysis will be available once survey has completed responses.";
+
   return (
     <div className="bg-[var(--glass-bg)] rounded-xl shadow-lg border border-border p-6 space-y-6">
       {/* Section Header */}
@@ -34,7 +60,11 @@ export function AISegmentationSection({
             Respondent clustering by satisfaction & preference score
           </h3>
           <div className="bg-background rounded-lg p-4 border border-border">
-            <ScatterPlotChart />
+            <ScatterPlotChart
+              pcaData={satisfactionData?.pca_2d}
+              segments={satisfactionData?.segments}
+              isLoading={isLoadingSatisfaction}
+            />
           </div>
         </div>
 
@@ -64,7 +94,10 @@ export function AISegmentationSection({
         <h3 className="font-semibold text-foreground">
           Detailed breakdown of each respondent segment
         </h3>
-        <SegmentationTable />
+        <SegmentationTable
+          segments={satisfactionData?.segments}
+          isLoading={isLoadingSatisfaction}
+        />
       </div>
 
       {/* AI Summary Box */}
@@ -72,11 +105,7 @@ export function AISegmentationSection({
         <div className="flex items-start gap-3">
           <Lightbulb className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
           <div className="text-sm text-muted-foreground">
-            <strong>AI Summary:</strong> Respondents in Segment 1 (average age
-            28) tend to prefer Product X with significantly higher satisfaction
-            rates (85%). This segment represents the most engaged and satisfied
-            user base. Segment 4 shows lower satisfaction and may require
-            targeted improvements.
+            <strong>AI Summary:</strong> {aiSummary}
           </div>
         </div>
       </div>

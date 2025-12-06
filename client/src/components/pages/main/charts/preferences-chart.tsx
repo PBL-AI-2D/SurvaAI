@@ -9,16 +9,51 @@ import {
   Legend,
 } from "recharts";
 
-const data = [
-  { name: "Product X", value: 45, fill: "var(--color-primary-1)" },
-  { name: "Product Y", value: 28, fill: "var(--color-primary-2)" },
-  { name: "Product Z", value: 17, fill: "var(--color-primary-3)" },
-  { name: "Others", value: 10, fill: "#B0BEC5" },
+interface PreferencesChartProps {
+  preferences?: Record<string, number>;
+  isLoading?: boolean;
+}
+
+const COLORS = [
+  "var(--color-primary-1)",
+  "var(--color-primary-2)",
+  "var(--color-primary-3)",
+  "#9C27B0",
+  "#00BCD4",
+  "#FF9800",
+  "#795548",
+  "#B0BEC5",
 ];
 
-const COLORS = ["var(--color-primary-1)", "var(--color-primary-2)", "var(--color-primary-3)", "#B0BEC5"];
+export function PreferencesChart({ preferences, isLoading }: PreferencesChartProps) {
+  // Convert preferences object to array format
+  const data = preferences
+    ? Object.entries(preferences)
+        .map(([name, value], index) => ({
+          name: name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+          value: value,
+          fill: COLORS[index % COLORS.length],
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8) // Limit to top 8 preferences
+    : [];
 
-export function PreferencesChart() {
+  if (isLoading) {
+    return (
+      <div className="h-64 w-full flex items-center justify-center">
+        <div className="text-sm text-muted-foreground">Loading chart data...</div>
+      </div>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-64 w-full flex items-center justify-center">
+        <div className="text-sm text-muted-foreground">No preference data available</div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -28,7 +63,7 @@ export function PreferencesChart() {
             cx="50%"
             cy="50%"
             labelLine={true}
-            label={({ name, value }) => `${name}: ${value}%`}
+            label={({ name, value }) => `${name}: ${value.toFixed(1)}%`}
             outerRadius={80}
             innerRadius={40}
             fill="#8884d8"
@@ -41,7 +76,7 @@ export function PreferencesChart() {
             ))}
           </Pie>
           <Tooltip
-            formatter={(value: number) => [`${value}%`, "Percentage"]}
+            formatter={(value: number) => [`${value.toFixed(1)}%`, "Percentage"]}
             labelStyle={{ color: "#374151", fontWeight: "500" }}
             contentStyle={{
               backgroundColor: "#fff",
