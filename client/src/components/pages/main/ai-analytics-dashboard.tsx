@@ -7,12 +7,44 @@ import { SurveyBreadcrumbNav } from "@/components/umum/breadcrumb-survey";
 import { NavUmum } from "@/components/umum/nav-umum";
 import { Bot, Download, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSurveySatisfactionAnalysis } from "@/features/survey/hooks/useSurveySatisfactionAnalysis";
+import { useUserSurvey } from "@/features/survey/hooks/useUserSurveys";
+import { generateAIInsightSummary, type SatisfactionData } from "@/utils/ai-insights";
+import { useMemo } from "react";
 
 interface AIAnalyticsDashboardProps {
   surveyId: string;
 }
 
 export function AIAnalyticsDashboard({ surveyId }: AIAnalyticsDashboardProps) {
+  // Fetch survey data to check if it has respondents
+  const { data: survey } = useUserSurvey(surveyId);
+  const hasRespondents = survey && (typeof survey.jumlah_responden === 'number' ? survey.jumlah_responden > 0 : Number(survey.jumlah_responden) > 0);
+  
+  // Fetch satisfaction analysis for AI Insight Summary
+  const { data: satisfactionData } = useSurveySatisfactionAnalysis(surveyId, hasRespondents);
+  
+  // Generate AI Insight Summary
+  const aiInsightSummary = useMemo(() => {
+    if (!satisfactionData) {
+      return null;
+    }
+    const satisfactionDataForInsight: SatisfactionData = {
+      satisfied: satisfactionData.satisfaction_percentage.satisfied,
+      neutral: satisfactionData.satisfaction_percentage.neutral,
+      unsatisfied: satisfactionData.satisfaction_percentage.unsatisfied,
+      total_respondents: satisfactionData.total_respondents,
+      major_preference: satisfactionData.major_preference,
+      segments: satisfactionData.segments?.map(seg => ({
+        segment_id: seg.segment_id,
+        satisfaction_percentage: seg.satisfaction_percentage,
+        satisfaction_status: seg.satisfaction_status,
+        respondent_count: seg.respondent_count,
+      })),
+    };
+    return generateAIInsightSummary(satisfactionDataForInsight);
+  }, [satisfactionData]);
+
   return (
     <main className="flex flex-col w-full overflow-hidden min-h-screen pt-16 pb-5 md:px-10 px-5">
       <NavUmum />
@@ -48,11 +80,7 @@ export function AIAnalyticsDashboard({ surveyId }: AIAnalyticsDashboardProps) {
                       AI Insight Summary
                     </h2>
                     <p className="text-sm opacity-90 leading-relaxed">
-                      68% satisfied, 22% neutral, 10% unsatisfied. Major
-                      preference category: Product X (45%). Satisfaction trend
-                      shows positive growth with 6% increase over the past 6
-                      months. Segment 1 demonstrates highest engagement and
-                      satisfaction rates.
+                      {aiInsightSummary || "Belum ada data survei terbaru untuk dianalisis. Tunggu hingga ada responden yang menyelesaikan survei."}
                     </p>
                   </div>
                 </div>

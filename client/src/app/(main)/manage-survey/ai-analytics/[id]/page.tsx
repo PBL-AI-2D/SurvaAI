@@ -1,14 +1,15 @@
 "use client";
 
 import { AIAnalyticsDashboard } from "@/components/pages/main/ai-analytics-dashboard";
-import React from "react";
+import React, { use } from "react";
 
 interface AIAnalyticsPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function AIAnalyticsPage({ params }: AIAnalyticsPageProps) {
-  return <AIAnalyticsDashboard surveyId={params.id} />;
+  const { id } = use(params);
+  return <AIAnalyticsDashboard surveyId={id} />;
 }

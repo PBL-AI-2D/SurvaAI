@@ -3,7 +3,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Drawer,
   DrawerContent,
@@ -23,9 +22,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { Search, TrendingUp, Upload, Download, Filter, ArrowUpDown, X, BarChart3 } from "lucide-react";
+import { TrendingUp, Upload, Download, Filter, ArrowUpDown, BarChart3, AlertTriangle, CheckCircle2, AlertCircle } from "lucide-react";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { generateModelPerformanceAlert, type ModelPerformanceMetrics } from "@/utils/ai-insights";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -47,7 +47,6 @@ export default function AdminAIMonitoringPage() {
   const [open, setOpen] = useState(false);
   const [updatingModel, setUpdatingModel] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState("Satisfaction Classifier");
-  const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("name");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
@@ -136,8 +135,6 @@ export default function AdminAIMonitoringPage() {
     { text: "Automated retraining scheduled for next week", time: "Mar 05, 2025 11:09" },
   ];
 
-  const normalizedQuery = searchQuery.toLowerCase().trim();
-
   // Helper function to parse accuracy percentage
   const parseAccuracy = (acc: string): number => {
     return parseFloat(acc.replace("%", ""));
@@ -148,20 +145,28 @@ export default function AdminAIMonitoringPage() {
     return new Date(dateStr);
   };
 
+  // Calculate model performance metrics from current model
+  const currentMetrics: ModelPerformanceMetrics = useMemo(() => {
+    const model = models.find(m => m.name === selectedModel);
+    if (!model) {
+      return { accuracy: 92.8, precision: 92.5, recall: 93.1, f1: 92.8 };
+    }
+    return {
+      accuracy: parseAccuracy(model.acc),
+      precision: 92.5, // In real implementation, fetch from API
+      recall: 93.1,
+      f1: 92.8,
+    };
+  }, [selectedModel, models]);
+
+  // Generate model performance alert
+  const performanceAlert = useMemo(() => {
+    return generateModelPerformanceAlert(currentMetrics, trend);
+  }, [currentMetrics, trend]);
+
   // Filter and sort models
   const filteredAndSortedModels = useMemo(() => {
     let filtered = models.filter((m) => {
-      // Search filter
-      if (normalizedQuery) {
-        const matchesSearch =
-          m.name.toLowerCase().includes(normalizedQuery) ||
-          m.version.toLowerCase().includes(normalizedQuery) ||
-          m.acc.toLowerCase().includes(normalizedQuery) ||
-          m.updated.toLowerCase().includes(normalizedQuery) ||
-          m.status.toLowerCase().includes(normalizedQuery);
-        if (!matchesSearch) return false;
-      }
-
       // Status filter
       if (statusFilter !== "all" && m.status.toLowerCase() !== statusFilter.toLowerCase()) {
         return false;
@@ -193,16 +198,7 @@ export default function AdminAIMonitoringPage() {
     });
 
     return filtered;
-  }, [models, normalizedQuery, statusFilter, sortBy, sortOrder]);
-
-  const filteredLogs = logs.filter((l) => {
-    if (!normalizedQuery) return true;
-
-    return (
-      l.text.toLowerCase().includes(normalizedQuery) ||
-      l.time.toLowerCase().includes(normalizedQuery)
-    );
-  });
+  }, [models, statusFilter, sortBy, sortOrder]);
 
   // Export to CSV function
   const exportToCSV = () => {
@@ -269,123 +265,147 @@ export default function AdminAIMonitoringPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Top bar: search and actions */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative w-full max-w-xl">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-70" />
-          <Input
-            placeholder="Search models, metrics, logs..."
-            className="pl-9"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2 ml-auto">
-          <Dialog open={comparisonOpen} onOpenChange={setComparisonOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Compare Models
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Model Comparison & Benchmarking</DialogTitle>
-                <DialogDescription>
-                  Select multiple models to compare their performance metrics side by side.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="border rounded-lg p-4">
-                  <h4 className="text-sm font-medium mb-3">Select Models to Compare</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    {models.map((m) => (
-                      <div key={m.name} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`compare-${m.name}`}
-                          checked={selectedModelsForComparison.includes(m.name)}
-                          onCheckedChange={() => toggleModelComparison(m.name)}
-                        />
-                        <label
-                          htmlFor={`compare-${m.name}`}
-                          className="text-sm cursor-pointer flex-1"
-                        >
-                          {m.name}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                {selectedModelsForComparison.length > 0 && (
-                  <div className="space-y-4">
-                    <div className="border rounded-lg p-4">
-                      <h4 className="text-sm font-medium mb-3">Performance Comparison</h4>
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={comparisonData} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="iter" />
-                            <YAxis domain={[70, 100]} />
-                            <Tooltip />
-                            <Legend />
-                            {selectedModelsForComparison.map((modelName, idx) => {
-                              const colors = ["#2563eb", "#22c55e", "#eab308", "#ef4444", "#8b5cf6", "#f97316"];
-                              return (
-                                <Line
-                                  key={`${modelName}-accuracy`}
-                                  type="monotone"
-                                  dataKey={`${modelName} - Accuracy`}
-                                  stroke={colors[idx % colors.length]}
-                                  strokeWidth={2}
-                                  dot={false}
-                                />
-                              );
-                            })}
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
+      {/* Model Performance Alert */}
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-4">
+        {/* Model Performance Alert */}
+        <Card className={`bg-muted/30 border-muted-foreground/20 ${
+          performanceAlert.status === "critical" ? "border-red-500/50" :
+          performanceAlert.status === "warning" ? "border-yellow-500/50" :
+          "border-green-500/50"
+        }`}>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              {performanceAlert.status === "critical" && <AlertCircle className="h-5 w-5 text-red-500" />}
+              {performanceAlert.status === "warning" && <AlertTriangle className="h-5 w-5 text-yellow-500" />}
+              {performanceAlert.status === "good" && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+              Model Performance Alert
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className={`text-sm font-medium ${
+              performanceAlert.status === "critical" ? "text-red-600 dark:text-red-400" :
+              performanceAlert.status === "warning" ? "text-yellow-600 dark:text-yellow-400" :
+              "text-green-600 dark:text-green-400"
+            }`}>
+              {performanceAlert.message}
+            </p>
+            {performanceAlert.details.length > 0 && (
+              <ul className="list-disc list-inside space-y-1 text-xs text-muted-foreground">
+                {performanceAlert.details.map((detail, idx) => (
+                  <li key={idx}>{detail}</li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top bar: actions */}
+      <div className="flex items-center gap-3 flex-wrap justify-end">
+        <Dialog open={comparisonOpen} onOpenChange={setComparisonOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Compare Models
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Model Comparison & Benchmarking</DialogTitle>
+              <DialogDescription>
+                Select multiple models to compare their performance metrics side by side.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="border rounded-lg p-4">
+                <h4 className="text-sm font-medium mb-3">Select Models to Compare</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {models.map((m) => (
+                    <div key={m.name} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`compare-${m.name}`}
+                        checked={selectedModelsForComparison.includes(m.name)}
+                        onCheckedChange={() => toggleModelComparison(m.name)}
+                      />
+                      <label
+                        htmlFor={`compare-${m.name}`}
+                        className="text-sm cursor-pointer flex-1"
+                      >
+                        {m.name}
+                      </label>
                     </div>
-                    <div className="border rounded-lg p-4">
-                      <h4 className="text-sm font-medium mb-3">Metrics Summary</h4>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Model</TableHead>
-                            <TableHead>Accuracy</TableHead>
-                            <TableHead>Version</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {selectedModelsForComparison.map((modelName) => {
-                            const model = models.find((m) => m.name === modelName);
-                            if (!model) return null;
+                  ))}
+                </div>
+              </div>
+              {selectedModelsForComparison.length > 0 && (
+                <div className="space-y-4">
+                  <div className="border rounded-lg p-4">
+                    <h4 className="text-sm font-medium mb-3">Performance Comparison</h4>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={comparisonData} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="iter" />
+                          <YAxis domain={[70, 100]} />
+                          <Tooltip />
+                          <Legend />
+                          {selectedModelsForComparison.map((modelName, idx) => {
+                            const colors = ["#2563eb", "#22c55e", "#eab308", "#ef4444", "#8b5cf6", "#f97316"];
                             return (
-                              <TableRow key={modelName}>
-                                <TableCell className="font-medium">{model.name}</TableCell>
-                                <TableCell>{model.acc}</TableCell>
-                                <TableCell>{model.version}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="border-green-500/40 text-green-400">
-                                    {model.status}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
+                              <Line
+                                key={`${modelName}-accuracy`}
+                                type="monotone"
+                                dataKey={`${modelName} - Accuracy`}
+                                stroke={colors[idx % colors.length]}
+                                strokeWidth={2}
+                                dot={false}
+                              />
                             );
                           })}
-                        </TableBody>
-                      </Table>
+                        </LineChart>
+                      </ResponsiveContainer>
                     </div>
                   </div>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
-          <Button variant="outline" size="sm" onClick={exportToCSV}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-        </div>
+                  <div className="border rounded-lg p-4">
+                    <h4 className="text-sm font-medium mb-3">Metrics Summary</h4>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Model</TableHead>
+                          <TableHead>Accuracy</TableHead>
+                          <TableHead>Version</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedModelsForComparison.map((modelName) => {
+                          const model = models.find((m) => m.name === modelName);
+                          if (!model) return null;
+                          return (
+                            <TableRow key={modelName}>
+                              <TableCell className="font-medium">{model.name}</TableCell>
+                              <TableCell>{model.acc}</TableCell>
+                              <TableCell>{model.version}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="border-green-500/40 text-green-400">
+                                  {model.status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+        <Button variant="outline" size="sm" onClick={exportToCSV}>
+          <Download className="h-4 w-4 mr-2" />
+          Export CSV
+        </Button>
       </div>
 
       {/* KPI cards */}
@@ -406,15 +426,13 @@ export default function AdminAIMonitoringPage() {
         ))}
       </div>
 
-      {/* Trend chart + dropdown */}
+      {/* Simplified Model Performance Trend */}
       <Card className="bg-muted/30 border-muted-foreground/20">
         <CardHeader className="flex items-center justify-between">
-          <CardTitle className="text-base text-muted-foreground">
+          <CardTitle className="text-base">
             Model Performance Trend{" "}
             <span className="font-semibold text-foreground">({selectedModel})</span>
           </CardTitle>
-
-          {/* Dropdown di kanan */}
           <select
             className="rounded-md border bg-background px-3 py-2 text-sm"
             value={selectedModel}
@@ -425,21 +443,65 @@ export default function AdminAIMonitoringPage() {
             ))}
           </select>
         </CardHeader>
-
-        <CardContent className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={trend} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="iter" />
-              <YAxis domain={[70, 100]} />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="accuracy" stroke="#2563eb" strokeWidth={2.5} dot={false} />
-              <Line type="monotone" dataKey="f1" stroke="#22c55e" strokeDasharray="6 4" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="precision" stroke="#eab308" strokeDasharray="3 3 1 3" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="recall" stroke="#ef4444" strokeDasharray="2 6" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Current Metrics Display */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <div className="text-xs text-muted-foreground mb-1">Accuracy</div>
+                <div className="text-xl font-semibold text-blue-700 dark:text-blue-400">
+                  {currentMetrics.accuracy.toFixed(1)}%
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                <div className="text-xs text-muted-foreground mb-1">Precision</div>
+                <div className="text-xl font-semibold text-green-700 dark:text-green-400">
+                  {currentMetrics.precision.toFixed(1)}%
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+                <div className="text-xs text-muted-foreground mb-1">Recall</div>
+                <div className="text-xl font-semibold text-yellow-700 dark:text-yellow-400">
+                  {currentMetrics.recall.toFixed(1)}%
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                <div className="text-xs text-muted-foreground mb-1">F1-Score</div>
+                <div className="text-xl font-semibold text-purple-700 dark:text-purple-400">
+                  {currentMetrics.f1.toFixed(1)}%
+                </div>
+              </div>
+            </div>
+            
+            {/* Simplified Trend Chart - Only Accuracy */}
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trend} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="iter" 
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis 
+                    domain={[70, 100]} 
+                    tick={{ fontSize: 12 }}
+                    label={{ value: 'Accuracy (%)', angle: -90, position: 'insideLeft' }}
+                  />
+                  <Tooltip 
+                    formatter={(value: number) => [`${value.toFixed(1)}%`, "Accuracy"]}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="accuracy" 
+                    stroke="#2563eb" 
+                    strokeWidth={3} 
+                    dot={{ r: 4, fill: "#2563eb" }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -592,7 +654,7 @@ export default function AdminAIMonitoringPage() {
             <CardTitle className="text-base">Notification Log</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {filteredLogs.map((l, i) => (
+            {logs.map((l, i) => (
               <div key={i} className="space-y-1">
                 <div className="flex items-start gap-2">
                   <div className={cn("h-2 w-2 rounded-full mt-2", i === 0 ? "bg-green-400" : "bg-muted-foreground/50")} />

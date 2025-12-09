@@ -1,17 +1,13 @@
+"use client";
+
 import type { Metadata } from "next";
 import { AnalysisSurveyPage } from "@/components/pages/main/analysis-survey";
+import { use } from "react";
 
-type Props = { params: { id: string } };
+type Props = { params: Promise<{ id: string }> };
 
-// Server-only: OK untuk generateMetadata
-export function generateMetadata({ params }: Props): Metadata {
-  const shortId = params.id.slice(0, 8);
-  return {
-    title: `Surva. - Analysis Survey #${shortId}`,
-  };
-}
-
-// Page tetap server; komponen di dalamnya boleh "use client"
+// Page component
 export default function Page({ params }: Props) {
-  return <AnalysisSurveyPage surveyId={params.id} />;
+  const { id } = use(params);
+  return <AnalysisSurveyPage surveyId={id} />;
 }
