@@ -80,21 +80,71 @@ def segment_respondents(
     X_scaled = scaler.fit_transform(X)
     
     # 3. Clustering (K-Means)
+    n_samples = len(X)
+    
+    # Validasi: jumlah sampel harus cukup untuk clustering
+    if n_samples < 2:
+        # Tidak cukup sampel untuk clustering, return semua sebagai 1 cluster
+        pca_data_simple = []
+        if n_samples == 1:
+            pca_data_simple = [{"x": 0.0, "y": 0.0, "cluster": 0}]
+        elif n_samples == 0:
+            pca_data_simple = []
+        
+        return {
+            "k_used": 1,
+            "segments": [{
+                "cluster_id": 0,
+                "label_name": "All Respondents",
+                "population_count": n_samples,
+                "avg_satisfaction": round(float(df_features['satisfaction'].mean()), 2) if n_samples > 0 else 0.0,
+                "avg_sentiment": round(float(df_features['sentiment'].mean()), 2) if n_samples > 0 else 0.0,
+                "preferred_products": _analyze_cluster_affinity(df_features, product_cols) if n_samples > 0 else [],
+                "demographics_mode": {}
+            }],
+            "pca_plot": pca_data_simple
+        }
+    
+    # Pastikan k tidak lebih besar dari jumlah sampel
+    k_min = min(k_min, n_samples)
+    k_max = min(k_max, n_samples)
+    
+    # Jika k sudah ditentukan, pastikan tidak lebih besar dari jumlah sampel
+    if k is not None:
+        k = min(k, n_samples)
+        if k < 1:
+            k = 1
+    
     k_analysis = None
     if k is None:
         # Simple Elbow/Silhouette
         silhouettes = {}
-        for i in range(k_min, k_max + 1):
-            if len(X) <= i: break
-            km = KMeans(n_clusters=i, random_state=random_state, n_init="auto")
-            lbls = km.fit_predict(X_scaled)
-            silhouettes[i] = silhouette_score(X_scaled, lbls)
+        # Pastikan k_min minimal 2 tapi tidak lebih dari jumlah sampel
+        actual_k_min = max(2, min(k_min, n_samples))
+        actual_k_max = min(k_max, n_samples)
+        
+        for i in range(actual_k_min, actual_k_max + 1):
+            if i >= n_samples:
+                break
+            try:
+                km = KMeans(n_clusters=i, random_state=random_state, n_init="auto")
+                lbls = km.fit_predict(X_scaled)
+                silhouettes[i] = silhouette_score(X_scaled, lbls)
+            except ValueError:
+                # Skip jika tidak bisa membuat cluster
+                break
         
         if silhouettes:
             k = max(silhouettes, key=silhouettes.get)
         else:
-            k = 3
+            # Fallback: gunakan jumlah sampel atau 1, mana yang lebih kecil
+            k = min(2, n_samples) if n_samples >= 2 else 1
         k_analysis = {"best_k": k, "scores": silhouettes}
+    
+    # Final validation: pastikan k tidak lebih besar dari jumlah sampel
+    k = min(k, n_samples)
+    if k < 1:
+        k = 1
 
     kmeans = KMeans(n_clusters=k, random_state=random_state, n_init="auto")
     cluster_labels = kmeans.fit_predict(X_scaled)
@@ -147,13 +197,19 @@ def segment_respondents(
     # 5. Output Visualisasi Scatter Plot
     pca = PCA(n_components=2)
     coords = pca.fit_transform(X_scaled)
+    # Convert cluster labels to 1-indexed untuk konsistensi dengan segment_id
     pca_data = [
-        {"x": float(c[0]), "y": float(c[1]), "cluster": int(l)} 
+        {"x": float(c[0]), "y": float(c[1]), "cluster": int(l) + 1} 
         for c, l in zip(coords, cluster_labels)
     ]
 
-    return {
+    result = {
         "k_used": k,
         "segments": segments_profile,
         "pca_plot": pca_data
     }
+    
+    if k_analysis is not None:
+        result["k_analysis"] = k_analysis
+    
+    return result

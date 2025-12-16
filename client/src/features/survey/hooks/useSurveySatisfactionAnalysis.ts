@@ -134,12 +134,14 @@ export const useSurveySatisfactionAnalysis = (
           index: idx + 1,
           score: score * 100,
         })),
-        segments: (pythonData.segmentation?.segment_details || []).map((segment) => ({
+        segments: (pythonData.segmentation?.segment_details || []).map((segment: any) => ({
           segment_id: segment.segment_id,
           respondent_count: segment.respondent_count,
           satisfaction_percentage: segment.satisfaction_percentage,
           satisfaction_status: segment.satisfaction_status,
           dominant_preference: segment.dominant_preference,
+          all_preferences: segment.all_preferences || [],
+          satisfaction_range: segment.satisfaction_range,
           avg_age: segment.avg_age,
         })),
         pca_2d: pythonData.segmentation?.pca_2d || [],

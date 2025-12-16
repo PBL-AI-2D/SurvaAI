@@ -27,14 +27,14 @@ export function SatisfactionTrendChart({ data, isLoading }: SatisfactionTrendCha
 
   if (isLoading) {
     return (
-      <div className="h-64 w-full flex items-center justify-center">
+      <div className="w-full h-full min-h-[400px] flex items-center justify-center">
         <div className="text-sm text-muted-foreground">Loading chart data...</div>
       </div>
     );
   }
 
   return (
-    <div className="h-64 w-full">
+    <div className="w-full h-full min-h-[400px]">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={chartData}

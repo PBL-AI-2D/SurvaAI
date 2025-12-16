@@ -48,10 +48,10 @@ export function SegmentationTable({ segments, isLoading }: SegmentationTableProp
               Respondents
             </TableHead>
             <TableHead className="font-semibold text-foreground">
-              Avg. Age
+              Key Characteristics
             </TableHead>
             <TableHead className="font-semibold text-foreground">
-              Dominant Preference
+              Satisfaction %
             </TableHead>
             <TableHead className="font-semibold text-foreground">
               Satisfaction %
@@ -66,10 +66,32 @@ export function SegmentationTable({ segments, isLoading }: SegmentationTableProp
               </TableCell>
               <TableCell>{segment.respondent_count}</TableCell>
               <TableCell>
-                {segment.avg_age ? `${segment.avg_age} years` : "N/A"}
-              </TableCell>
-              <TableCell>
-                {segment.dominant_preference || "N/A"}
+                <div className="space-y-1.5">
+                  {segment.dominant_preference && segment.dominant_preference !== "N/A" ? (
+                    <div className="text-sm">
+                      <span className="font-medium">Preference:</span>{" "}
+                      <span className="text-muted-foreground">{segment.dominant_preference}</span>
+                    </div>
+                  ) : null}
+                  {segment.all_preferences && segment.all_preferences.length > 1 ? (
+                    <div className="text-xs text-muted-foreground">
+                      <span className="font-medium">Also:</span> {segment.all_preferences.slice(1).join(", ")}
+                    </div>
+                  ) : null}
+                  {segment.satisfaction_range && segment.satisfaction_range.includes(" - ") ? (
+                    <div className="text-xs text-muted-foreground">
+                      <span className="font-medium">Range:</span> {segment.satisfaction_range}
+                    </div>
+                  ) : null}
+                  {segment.avg_age ? (
+                    <div className="text-xs text-muted-foreground">
+                      Avg. Age: {segment.avg_age} years
+                    </div>
+                  ) : null}
+                  {!segment.dominant_preference || segment.dominant_preference === "N/A" ? (
+                    <span className="text-sm text-muted-foreground">No specific preference identified</span>
+                  ) : null}
+                </div>
               </TableCell>
               <TableCell>
                 <span

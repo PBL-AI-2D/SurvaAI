@@ -84,11 +84,11 @@ export function AIAnalysisSurveySection({
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-background rounded-lg p-5 shadow-sm border border-border">
+        <div className="bg-background rounded-lg p-5 shadow-sm border border-border flex flex-col">
           <h4 className="text-sm font-semibold text-foreground mb-4">
             Distribution of respondent satisfaction levels
           </h4>
-          <div className="h-64">
+          <div className="flex-1 min-h-[400px]">
             <ClassificationChart
               satisfactionPercentage={satisfactionData?.satisfaction_percentage}
               isLoading={isLoading}
@@ -96,11 +96,11 @@ export function AIAnalysisSurveySection({
           </div>
         </div>
 
-        <div className="bg-background rounded-lg p-5 shadow-sm border border-border">
+        <div className="bg-background rounded-lg p-5 shadow-sm border border-border flex flex-col">
           <h4 className="text-sm font-semibold text-foreground mb-4">
             Distribution by preference category
           </h4>
-          <div className="h-64">
+          <div className="flex-1 min-h-[400px]">
             <PreferencesChart
               preferences={satisfactionData?.preferences}
               isLoading={isLoading}
@@ -108,11 +108,11 @@ export function AIAnalysisSurveySection({
           </div>
         </div>
 
-        <div className="bg-background rounded-lg p-5 shadow-sm border border-border">
+        <div className="bg-background rounded-lg p-5 shadow-sm border border-border flex flex-col">
           <h4 className="text-sm font-semibold text-foreground mb-4">
             Satisfaction trend over time
           </h4>
-          <div className="h-64">
+          <div className="flex-1 min-h-[400px]">
             <SatisfactionTrendChart
               data={satisfactionTrendData}
               isLoading={isLoading}

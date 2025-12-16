@@ -29,7 +29,7 @@ model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH)
 model.eval()
 
 def predict_single(text: str) -> Dict:
-    tokens = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+    tokens = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=512)
     with torch.no_grad():
         output = model(**tokens)
         probs = F.softmax(output.logits, dim=1)

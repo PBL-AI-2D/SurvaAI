@@ -135,7 +135,9 @@ export function ScatterPlotChart({ pcaData, segments, isLoading }: ScatterPlotCh
                 ></div>
                 <span className="text-sm text-muted-foreground">
                   Segment {clusterId}
-                  {segment && ` (${segment.satisfaction_status})`}
+                  {segment && segment.dominant_preference && segment.dominant_preference !== "N/A" 
+                    ? ` - ${segment.dominant_preference}`
+                    : segment && ` (${segment.satisfaction_status})`}
                 </span>
               </div>
             );

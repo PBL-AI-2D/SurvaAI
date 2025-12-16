@@ -1,4 +1,5 @@
 from typing import List, Dict, Any, Optional
+from collections import Counter
 import numpy as np
 import pandas as pd
 
@@ -35,33 +36,80 @@ def _convert_categorical_to_product_features(
     """
     Konversi categorical features menjadi product_features format One-Hot Encoding.
     Format output: List[Dict[str, int]] dimana setiap dict adalah one-hot untuk satu responden.
+    Handle array values (checkbox) dan single values (radio/dropdown).
     """
     if not categorical_features:
         return []
     
-    df_cat = pd.DataFrame(categorical_features)
-    # Fill NaN values and infer objects to avoid FutureWarning about downcasting
-    # Use infer_objects before fillna to prevent downcasting warning
-    df_cat = df_cat.infer_objects(copy=False).fillna(0)
-    # Convert object columns to numeric if possible, otherwise keep as is
-    for col in df_cat.columns:
-        try:
-            df_cat[col] = pd.to_numeric(df_cat[col])
-        except (TypeError, ValueError):
-            # Keep as is if conversion fails
-            pass
-    
-    # Konversi semua kolom menjadi integer (0 atau 1 untuk one-hot)
-    product_features = []
-    for idx in range(len(df_cat)):
-        row_dict = {}
-        for col in df_cat.columns:
-            val = df_cat.iloc[idx][col]
-            # Konversi ke 0 atau 1
-            if pd.isna(val) or val == 0 or val == False or val == "":
-                row_dict[str(col)] = 0  # Convert column name to string
+    # Collect all unique values across all categorical features untuk one-hot encoding
+    all_unique_values = {}
+    for cat_dict in categorical_features:
+        if not cat_dict or not isinstance(cat_dict, dict):
+            continue
+        for col_name, col_value in cat_dict.items():
+            if col_name not in all_unique_values:
+                all_unique_values[col_name] = set()
+            
+            if col_value is None:
+                continue
+            
+            # Handle array values (checkbox)
+            if isinstance(col_value, list):
+                for val in col_value:
+                    if val is not None and val != "":
+                        all_unique_values[col_name].add(str(val))
+            elif isinstance(col_value, (dict, set)):
+                for val in col_value:
+                    if val is not None and val != "":
+                        all_unique_values[col_name].add(str(val))
             else:
-                row_dict[str(col)] = 1  # Convert column name to string
+                # Single value
+                val_str = str(col_value).strip()
+                if val_str:
+                    all_unique_values[col_name].add(val_str)
+    
+    # Build one-hot encoding untuk setiap responden
+    product_features = []
+    for cat_dict in categorical_features:
+        row_dict = {}
+        
+        # Initialize semua kolom dengan 0
+        for col_name, unique_values in all_unique_values.items():
+            for val in unique_values:
+                key = f"{str(col_name)}:{val}"
+                row_dict[key] = 0
+        
+        # Set 1 untuk nilai yang dipilih responden ini
+        if cat_dict and isinstance(cat_dict, dict):
+            for col_name, col_value in cat_dict.items():
+                if col_value is None:
+                    continue
+                
+                # Handle array values (checkbox)
+                if isinstance(col_value, list):
+                    for val in col_value:
+                        if val is not None and val != "":
+                            val_str = str(val).strip()
+                            if val_str:
+                                key = f"{str(col_name)}:{val_str}"
+                                if key in row_dict:
+                                    row_dict[key] = 1
+                elif isinstance(col_value, (dict, set)):
+                    for val in col_value:
+                        if val is not None and val != "":
+                            val_str = str(val).strip()
+                            if val_str:
+                                key = f"{str(col_name)}:{val_str}"
+                                if key in row_dict:
+                                    row_dict[key] = 1
+                else:
+                    # Single value
+                    val_str = str(col_value).strip()
+                    if val_str:
+                        key = f"{str(col_name)}:{val_str}"
+                        if key in row_dict:
+                            row_dict[key] = 1
+        
         product_features.append(row_dict)
     
     return product_features
@@ -71,39 +119,88 @@ def _extract_preference_from_categorical(
     categorical_features: List[Dict[str, Any]]
 ) -> Dict[str, float]:
     """
-    Extract preferensi produk/jasa dari categorical features.
-    Asumsi: kolom yang mengandung 'product', 'prefer', atau nama produk tertentu.
+    Extract distribusi preferensi/pilihan dari categorical features.
+    Mengambil semua kolom categorical yang valid dan menghitung distribusinya.
+    Handle array values (untuk checkbox) dan single values (untuk radio/dropdown).
+    Filter kolom yang jelas bukan preferensi (seperti age, id, dll).
     """
     if not categorical_features:
         return {}
     
-    df_cat = pd.DataFrame(categorical_features)
+    # Filter out empty dicts untuk menghitung total responden yang punya data categorical
+    non_empty_categorical = [cat for cat in categorical_features if cat and isinstance(cat, dict) and len(cat) > 0]
     
-    # Cari kolom yang kemungkinan adalah preferensi produk
-    # Handle both string and integer column names
-    preference_cols = []
-    for col in df_cat.columns:
-        col_str = str(col).lower()  # Convert to string first
-        if any(keyword in col_str for keyword in ['product', 'prefer', 'like', 'choose']):
-            preference_cols.append(col)
-    
-    if not preference_cols:
+    if not non_empty_categorical:
         return {}
     
-    # Hitung rata-rata (frekuensi) per preferensi
-    preference_scores = {}
-    for col in preference_cols:
-        try:
-            avg_score = df_cat[col].mean()
-            if avg_score > 0:
-                # Normalisasi ke persentase (asumsi one-hot encoding)
-                preference_scores[str(col)] = round(avg_score * 100, 1)
-        except (TypeError, ValueError):
-            # Skip kolom yang tidak bisa dihitung mean-nya
-            continue
+    # Kolom yang harus di-exclude (bukan preferensi)
+    exclude_keywords = ['age', 'id', 'nama', 'name', 'email', 'phone', 'tanggal', 'date', 
+                        'time', 'timestamp', 'created', 'updated', 'cluster']
     
-    # Sort by score descending
-    sorted_prefs = dict(sorted(preference_scores.items(), key=lambda x: x[1], reverse=True))
+    # Flatten array values dan hitung distribusi
+    # Struktur: {col_name: {value: count}}
+    col_value_counts = {}
+    total_all_selections = 0  # Total semua pilihan yang dipilih (untuk normalisasi ke 100%)
+    
+    # Iterate through each categorical feature dict
+    for cat_dict in non_empty_categorical:
+        if not cat_dict or not isinstance(cat_dict, dict):
+            continue
+            
+        for col_name, col_value in cat_dict.items():
+            # Skip kolom yang jelas bukan preferensi
+            col_str = str(col_name).lower()
+            if any(exclude_kw in col_str for exclude_kw in exclude_keywords):
+                continue
+            
+            # Skip jika nilai kosong atau None
+            if col_value is None:
+                continue
+            
+            # Initialize tracking untuk kolom ini
+            if col_name not in col_value_counts:
+                col_value_counts[col_name] = {}
+            
+            # Handle array values (checkbox) dan single values (radio/dropdown)
+            values_to_count = []
+            
+            if isinstance(col_value, list):
+                # Array values - flatten semua nilai
+                for val in col_value:
+                    if val is not None and val != "":
+                        val_str = str(val).strip()
+                        if val_str:
+                            values_to_count.append(val_str)
+            elif isinstance(col_value, (dict, set)):
+                # Convert dict/set to list
+                values_to_count = [str(v).strip() for v in col_value if v is not None and v != "" and str(v).strip()]
+            else:
+                # Single value
+                val_str = str(col_value).strip()
+                if val_str:
+                    values_to_count.append(val_str)
+            
+            # Hitung distribusi untuk setiap nilai
+            for value in values_to_count:
+                if value not in col_value_counts[col_name]:
+                    col_value_counts[col_name][value] = 0
+                col_value_counts[col_name][value] += 1
+                total_all_selections += 1
+    
+    # Konversi count ke persentase berdasarkan total semua pilihan (agar pie chart total = 100%)
+    preference_scores = {}
+    if total_all_selections > 0:
+        for col_name, value_counts in col_value_counts.items():
+            for value, count in value_counts.items():
+                percentage = (count / total_all_selections) * 100
+                # Format display name: "Kolom: Nilai"
+                display_name = f"{str(col_name)}: {value}"
+                preference_scores[display_name] = round(percentage, 1)
+    
+    # Filter out nilai dengan persentase 0 dan sort by score descending
+    filtered_prefs = {k: v for k, v in preference_scores.items() if v > 0}
+    sorted_prefs = dict(sorted(filtered_prefs.items(), key=lambda x: x[1], reverse=True))
+    
     return sorted_prefs
 
 
@@ -163,19 +260,72 @@ def _calculate_segment_details(
             
             cluster_cat = cat_df[cat_df["cluster"] == cluster_id]
             
+            # Kolom yang harus di-exclude (bukan preferensi)
+            exclude_keywords = ['age', 'id', 'nama', 'name', 'email', 'phone', 'tanggal', 'date', 
+                              'time', 'timestamp', 'created', 'updated', 'cluster']
+            
             # Cari kolom preferensi dengan nilai tertinggi
             pref_cols = []
             for col in cluster_cat.columns:
                 if col == "cluster":
                     continue
-                col_str = str(col).lower()  # Convert to string first
-                if any(keyword in col_str for keyword in ['product', 'prefer', 'like', 'choose']):
-                    pref_cols.append(col)
+                col_str = str(col).lower()
+                # Skip kolom yang jelas bukan preferensi
+                if any(exclude_kw in col_str for exclude_kw in exclude_keywords):
+                    continue
+                pref_cols.append(col)
             
             if pref_cols:
-                pref_scores = cluster_cat[pref_cols].mean().sort_values(ascending=False)
-                if len(pref_scores) > 0 and pref_scores.iloc[0] > 0:
-                    dominant_preference = pref_scores.index[0].replace("prefer_", "").replace("_", " ").title()
+                # Hitung rata-rata untuk kolom numerik atau distribusi untuk non-numerik
+                pref_scores_dict = {}
+                for col in pref_cols:
+                    try:
+                        col_data = pd.to_numeric(cluster_cat[col], errors='coerce')
+                        if not col_data.isna().all():
+                            avg_score = col_data.mean()
+                            if avg_score > 0:
+                                pref_scores_dict[col] = avg_score
+                        else:
+                            # Untuk non-numerik, ambil nilai yang paling sering muncul
+                            # Handle array values dalam kolom
+                            all_values = []
+                            for val in cluster_cat[col]:
+                                if pd.isna(val):
+                                    continue
+                                if isinstance(val, list):
+                                    all_values.extend([str(v) for v in val if v is not None and str(v).strip()])
+                                else:
+                                    all_values.append(str(val).strip())
+                            
+                            if all_values:
+                                value_counts = Counter(all_values)
+                                if value_counts:
+                                    most_common_value = value_counts.most_common(1)[0][0]
+                                    most_common_count = value_counts.most_common(1)[0][1]
+                                    total_count = len(all_values)
+                                    if total_count > 0:
+                                        percentage = (most_common_count / total_count)
+                                        # Format: hanya nilai, tanpa nama kolom jika terlalu panjang
+                                        if len(most_common_value) <= 30:
+                                            pref_scores_dict[f"{col}: {most_common_value}"] = percentage
+                                        else:
+                                            pref_scores_dict[most_common_value[:30]] = percentage
+                    except (TypeError, ValueError):
+                        continue
+                
+                if pref_scores_dict:
+                    # Sort dan ambil yang tertinggi
+                    sorted_prefs = sorted(pref_scores_dict.items(), key=lambda x: x[1], reverse=True)
+                    if len(sorted_prefs) > 0 and sorted_prefs[0][1] > 0:
+                        pref_key = str(sorted_prefs[0][0])
+                        # Format: jika ada ":", ambil bagian setelah ":" saja
+                        if ": " in pref_key:
+                            dominant_preference = pref_key.split(": ", 1)[1].strip()
+                        else:
+                            dominant_preference = pref_key.replace("_", " ").title()
+                        # Truncate jika terlalu panjang
+                        if len(dominant_preference) > 40:
+                            dominant_preference = dominant_preference[:37] + "..."
         
         # Avg age (jika ada)
         avg_age = None
@@ -195,11 +345,30 @@ def _calculate_segment_details(
         else:
             satisfaction_status = "low"  # red
         
+        # Hitung min/max satisfaction untuk menunjukkan range
+        min_satisfaction = round(subset["satisfaction"].min() * 100, 1)
+        max_satisfaction = round(subset["satisfaction"].max() * 100, 1)
+        
+        # Kumpulkan semua preferences yang berbeda (top 3)
+        all_preferences_list = []
+        if pref_scores_dict:
+            sorted_prefs = sorted(pref_scores_dict.items(), key=lambda x: x[1], reverse=True)
+            for pref_key, pref_score in sorted_prefs[:3]:  # Top 3 preferences
+                if ": " in pref_key:
+                    pref_value = pref_key.split(": ", 1)[1].strip()
+                else:
+                    pref_value = pref_key.replace("_", " ").title()
+                if len(pref_value) > 30:
+                    pref_value = pref_value[:27] + "..."
+                all_preferences_list.append(pref_value)
+        
         segment_details.append({
-            "segment_id": int(cluster_id) + 1,  # 1-indexed untuk display
+            "segment_id": int(cluster_id),  # cluster_id sudah 1-indexed dari pca_plot
             "avg_age": int(avg_age) if avg_age else None,
             "dominant_preference": dominant_preference,
+            "all_preferences": all_preferences_list if all_preferences_list else [],
             "satisfaction_percentage": avg_satisfaction_pct,
+            "satisfaction_range": f"{min_satisfaction}% - {max_satisfaction}%" if min_satisfaction != max_satisfaction else f"{avg_satisfaction_pct}%",
             "satisfaction_status": satisfaction_status,
             "respondent_count": len(subset),
         })
@@ -256,7 +425,17 @@ def generate_dashboard_data(
                 sentiment_dist["negative"] += 1
             else:
                 sentiment_dist["neutral"] += 1
-    categorical_features = [r.get("categorical", {}) for r in responses]
+    # Extract categorical features (None akan menjadi {})
+    categorical_features = []
+    for r in responses:
+        cat = r.get("categorical")
+        # Handle None, empty dict, atau dict yang valid
+        if cat is None:
+            categorical_features.append({})
+        elif isinstance(cat, dict):
+            categorical_features.append(cat)
+        else:
+            categorical_features.append({})
     
     # Konversi categorical_features ke product_features (One-Hot Encoding)
     product_features = _convert_categorical_to_product_features(categorical_features)

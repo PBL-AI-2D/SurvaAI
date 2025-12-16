@@ -47,6 +47,129 @@ export function DashboardAnalyticSection({
     isError: isErrorSatisfaction,
   } = useSurveySatisfactionAnalysis(surveyId, hasRespondents);
 
+  const isLoading = isLoadingSatisfaction || isLoadingResponses;
+
+  const handleFilterChange = (newFilters: FilterValues) => {
+    setFilters(newFilters);
+  };
+
+  // Check if filters are active
+  const isFiltered = useMemo(() => {
+    return filters.gender !== "all" || 
+           filters.ageRange !== "all" || 
+           filters.satisfaction !== "all" || 
+           filters.satisfactionLevel !== "all";
+  }, [filters]);
+
+  // Filter segments berdasarkan filter yang dipilih
+  const filteredSegments = useMemo(() => {
+    if (!satisfactionData?.segments) return [];
+    
+    return satisfactionData.segments.filter((segment) => {
+      // Filter berdasarkan satisfaction level
+      if (filters.satisfactionLevel !== "all") {
+        if (segment.satisfaction_status !== filters.satisfactionLevel) {
+          return false;
+        }
+      }
+
+      // Filter berdasarkan satisfaction percentage range
+      if (filters.satisfaction !== "all") {
+        const satisfaction = segment.satisfaction_percentage;
+        switch (filters.satisfaction) {
+          case "very-satisfied":
+            if (satisfaction < 90) return false;
+            break;
+          case "satisfied":
+            if (satisfaction < 70 || satisfaction >= 90) return false;
+            break;
+          case "neutral":
+            if (satisfaction < 50 || satisfaction >= 70) return false;
+            break;
+          case "dissatisfied":
+            if (satisfaction < 30 || satisfaction >= 50) return false;
+            break;
+          case "very-dissatisfied":
+            if (satisfaction >= 30) return false;
+            break;
+        }
+      }
+
+      // Filter berdasarkan age range (jika ada avg_age)
+      if (filters.ageRange !== "all" && segment.avg_age) {
+        const age = segment.avg_age;
+        switch (filters.ageRange) {
+          case "18-25":
+            if (age < 18 || age > 25) return false;
+            break;
+          case "26-35":
+            if (age < 26 || age > 35) return false;
+            break;
+          case "36-45":
+            if (age < 36 || age > 45) return false;
+            break;
+          case "46-55":
+            if (age < 46 || age > 55) return false;
+            break;
+          case "55+":
+            if (age < 55) return false;
+            break;
+        }
+      }
+
+      return true;
+    });
+  }, [satisfactionData?.segments, filters]);
+
+  // Hitung metrics dari filtered segments
+  const filteredMetrics = useMemo(() => {
+    if (!filteredSegments.length) {
+      return {
+        totalRespondents: 0,
+        avgSatisfaction: 0,
+        satisfiedPct: 0,
+        activeSegments: 0,
+      };
+    }
+
+    const totalRespondents = filteredSegments.reduce((sum, seg) => sum + seg.respondent_count, 0);
+    const totalSatisfaction = filteredSegments.reduce(
+      (sum, seg) => sum + (seg.satisfaction_percentage * seg.respondent_count),
+      0
+    );
+    const avgSatisfaction = totalRespondents > 0 ? totalSatisfaction / totalRespondents : 0;
+    
+    const satisfiedCount = filteredSegments.reduce(
+      (sum, seg) => sum + (seg.satisfaction_status === "high" ? seg.respondent_count : 0),
+      0
+    );
+    const satisfiedPct = totalRespondents > 0 ? (satisfiedCount / totalRespondents) * 100 : 0;
+
+    return {
+      totalRespondents,
+      avgSatisfaction,
+      satisfiedPct,
+      activeSegments: filteredSegments.length,
+    };
+  }, [filteredSegments]);
+
+  // Create filtered satisfaction data untuk chart dan conclusion
+  const filteredSatisfactionData = useMemo(() => {
+    if (!isFiltered || !satisfactionData) return satisfactionData;
+    
+    return {
+      ...satisfactionData,
+      segments: filteredSegments,
+      total_respondents: filteredMetrics.totalRespondents,
+      average_satisfaction: filteredMetrics.avgSatisfaction / 10,
+      satisfaction_percentage: {
+        satisfied: filteredMetrics.satisfiedPct,
+        neutral: 0,
+        unsatisfied: 100 - filteredMetrics.satisfiedPct,
+      },
+    };
+  }, [satisfactionData, filteredSegments, filteredMetrics, isFiltered]);
+
   // Process chart data
   const timePatternData = useMemo(() => {
     if (!responSurveis || responSurveis.length === 0) return undefined;
@@ -55,31 +178,12 @@ export function DashboardAnalyticSection({
 
   const satisfactionTrendData = useMemo(() => {
     if (!responSurveis || responSurveis.length === 0) return undefined;
-    return processSatisfactionTrend(responSurveis, satisfactionData);
-  }, [responSurveis, satisfactionData]);
+    return processSatisfactionTrend(responSurveis, filteredSatisfactionData);
+  }, [responSurveis, filteredSatisfactionData]);
 
   const conclusionText = useMemo(() => {
-    return generateConclusion(satisfactionData, responSurveis, timePatternData);
-  }, [satisfactionData, responSurveis, timePatternData]);
-
-  const isLoading = isLoadingSatisfaction || isLoadingResponses;
-
-  const handleFilterChange = (newFilters: FilterValues) => {
-    setFilters(newFilters);
-    // TODO: Apply filters to actual data when data fetching is implemented
-    console.log("Filters changed:", newFilters);
-  };
-
-  // Memoized filtered data (placeholder - replace with actual data filtering when data is available)
-  const filteredData = useMemo(() => {
-    // This is a placeholder - when real data is available, filter it here based on filters state
-    return {
-      isFiltered: filters.gender !== "all" || 
-                  filters.ageRange !== "all" || 
-                  filters.satisfaction !== "all" || 
-                  filters.satisfactionLevel !== "all",
-    };
-  }, [filters]);
+    return generateConclusion(filteredSatisfactionData, responSurveis, timePatternData);
+  }, [filteredSatisfactionData, responSurveis, timePatternData]);
 
   return (
     <div className="bg-[var(--glass-bg)] rounded-xl shadow-lg border border-border p-6 space-y-6">
@@ -91,12 +195,17 @@ export function DashboardAnalyticSection({
         <p className="text-muted-foreground">
           Comprehensive metrics and predictive analytics
         </p>
-        {filteredData.isFiltered && (
+        {isFiltered && (
           <p className="text-sm text-muted-foreground italic">
             Filters applied: {Object.entries(filters)
               .filter(([_, value]) => value !== "all")
               .map(([key, value]) => `${key}: ${value}`)
               .join(", ") || "None"}
+            {filteredSegments.length !== satisfactionData?.segments?.length && (
+              <span className="ml-2">
+                ({filteredSegments.length} of {satisfactionData?.segments?.length || 0} segments shown)
+              </span>
+            )}
           </p>
         )}
       </div>
@@ -114,8 +223,8 @@ export function DashboardAnalyticSection({
         {/* Summary Cards */}
         <div className="lg:col-span-3">
           <SummaryCards 
-            satisfactionData={satisfactionData}
-            totalResponses={responSurveis?.length || 0}
+            satisfactionData={filteredSatisfactionData}
+            totalResponses={isFiltered ? filteredMetrics.totalRespondents : responSurveis?.length || 0}
             isLoading={isLoading}
           />
         </div>
@@ -129,7 +238,7 @@ export function DashboardAnalyticSection({
           </h3>
           <SatisfactionAnalysisCard
             surveiId={surveyId}
-            analysisData={satisfactionData}
+            analysisData={filteredSatisfactionData}
             isLoading={isLoadingSatisfaction}
             isError={isErrorSatisfaction}
           />

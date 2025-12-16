@@ -30,34 +30,31 @@ export function FilterDropdowns({ onFilterChange }: FilterDropdownsProps) {
     filterType: keyof FilterValues,
     value: string
   ) => {
-    const newFilters: FilterValues = {
-      gender,
-      ageRange,
-      satisfaction,
-      satisfactionLevel,
-      [filterType]: value,
-    };
-
+    // Update local state
     switch (filterType) {
       case "gender":
         setGender(value);
-        newFilters.gender = value;
         break;
       case "ageRange":
         setAgeRange(value);
-        newFilters.ageRange = value;
         break;
       case "satisfaction":
         setSatisfaction(value);
-        newFilters.satisfaction = value;
         break;
       case "satisfactionLevel":
         setSatisfactionLevel(value);
-        newFilters.satisfactionLevel = value;
         break;
     }
 
-    // Call the callback with updated filters
+    // Create updated filters object
+    const newFilters: FilterValues = {
+      gender: filterType === "gender" ? value : gender,
+      ageRange: filterType === "ageRange" ? value : ageRange,
+      satisfaction: filterType === "satisfaction" ? value : satisfaction,
+      satisfactionLevel: filterType === "satisfactionLevel" ? value : satisfactionLevel,
+    };
+
+    // Call the callback immediately with updated filters
     if (onFilterChange) {
       onFilterChange(newFilters);
     }

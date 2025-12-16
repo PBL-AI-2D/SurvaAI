@@ -20,6 +20,8 @@ export interface CustomerSegment {
   satisfaction_percentage: number;
   satisfaction_status: "high" | "medium" | "low";
   dominant_preference?: string;
+  all_preferences?: string[];
+  satisfaction_range?: string;
   avg_age?: number;
 }
 
