@@ -1,107 +1,138 @@
 from typing import List, Dict, Any
 
 
-def _build_single_segment_insight(segment: Dict[str, Any]) -> Dict[str, str]:
+def _get_dominant_preference(preferred_products: List[Dict[str, Any]]) -> str:
     """
-    Bangun insight teks untuk satu segment dengan format:
-
-    Segment X → Masalah → Penyebab → Rekomendasi
-
-    Tanpa ML berat, hanya rule‑based sederhana yang logis.
+    Ambil preferensi paling dominan dari hasil affinity.
     """
-    seg_id = segment.get("segment_id")
-    sat_pct = float(segment.get("satisfaction_percentage", 0.0))
-    status = segment.get("satisfaction_status", "medium")
-    dominant_pref = segment.get("dominant_preference") or "tidak terdeteksi"
-    respondent_count = int(segment.get("respondent_count", 0))
+    if not preferred_products:
+        return "umum"
 
-    # 1. Masalah (Problem)
-    if sat_pct < 50:
-        problem = (
-            f"Kepuasan sangat rendah ({sat_pct:.1f}%) pada {respondent_count} responden."
+    top = preferred_products[0]
+    return top.get("product_name", "umum")
+
+
+def _build_segment_problem(avg_satisfaction: float, population: int) -> str:
+    """
+    Tentukan masalah utama berdasarkan tingkat kepuasan segmen.
+    """
+    if avg_satisfaction < 0.5:
+        return (
+            f"Kepuasan rendah ({avg_satisfaction:.2f}) pada {population} responden "
+            "menunjukkan adanya masalah serius yang perlu segera ditangani."
         )
-    elif sat_pct < 70:
-        problem = (
-            f"Kepuasan sedang ({sat_pct:.1f}%) dan masih berpotensi turun jika tidak ditangani."
+    elif avg_satisfaction < 0.75:
+        return (
+            f"Kepuasan sedang ({avg_satisfaction:.2f}) pada {population} responden "
+            "menunjukkan pengalaman pengguna belum optimal."
         )
     else:
-        problem = (
-            f"Kepuasan tinggi ({sat_pct:.1f}%), namun tetap perlu dijaga agar tidak menurun."
+        return (
+            f"Kepuasan tinggi ({avg_satisfaction:.2f}) pada {population} responden, "
+            "namun tetap perlu dijaga agar tidak menurun."
         )
 
-    # 2. Penyebab (Cause) – berbasis preferensi dominan
-    cause = (
-        f"Preferensi dominan segmen ini adalah '{dominant_pref}', "
-        "yang menunjukkan fokus utama responden pada aspek tersebut."
+
+def _build_segment_recommendation(
+    dominant_pref: str,
+    avg_satisfaction: float,
+) -> str:
+    """
+    Rule-based recommendation berdasarkan preferensi dominan.
+    """
+    pref = dominant_pref.lower()
+
+    if any(k in pref for k in ["harga", "biaya", "fee", "diskon", "promo"]):
+        return (
+            "Lakukan evaluasi strategi harga dengan meningkatkan transparansi biaya, "
+            "menyediakan variasi promo yang relevan, serta menguji paket harga yang "
+            "lebih fleksibel untuk segmen ini."
+        )
+
+    if any(k in pref for k in ["fitur", "feature", "fungsi"]):
+        return (
+            "Prioritaskan pengembangan dan penyempurnaan fitur yang paling sering "
+            "digunakan oleh segmen ini. Lakukan uji coba bertahap dan kumpulkan feedback "
+            "setelah implementasi."
+        )
+
+    if any(k in pref for k in ["layanan", "service", "support", "cs"]):
+        return (
+            "Tingkatkan kualitas layanan dengan mempercepat waktu respon, "
+            "meningkatkan kejelasan informasi, dan memperkuat standar operasional layanan."
+        )
+
+    if any(k in pref for k in ["kecepatan", "respon", "waktu", "loading"]):
+        return (
+            "Optimalkan performa sistem dengan mempercepat waktu respon dan "
+            "menyederhanakan alur proses yang berpotensi menghambat pengalaman pengguna."
+        )
+
+    # Fallback (aman & akademis)
+    if avg_satisfaction < 0.75:
+        return (
+            "Lakukan survei lanjutan atau wawancara singkat pada segmen ini untuk "
+            "menggali kebutuhan spesifik yang belum terpenuhi."
+        )
+
+    return (
+        "Pertahankan kualitas layanan dan lakukan pemantauan berkala untuk memastikan "
+        "kepuasan segmen ini tetap stabil."
     )
 
-    # 3. Rekomendasi (Recommendation) – rule‑based per preferensi
-    pref_lower = str(dominant_pref).lower()
 
-    if any(keyword in pref_lower for keyword in ["harga", "fee", "biaya", "diskon"]):
-        recommendation = (
-            "Optimalkan strategi harga dan transparansi biaya: perbanyak promo yang terukur, "
-            "jelaskan komponen biaya secara rinci, dan uji beberapa paket harga yang lebih fleksibel."
-        )
-    elif any(keyword in pref_lower for keyword in ["fitur", "fungsi", "feature"]):
-        recommendation = (
-            "Prioritaskan pengembangan dan perbaikan fitur yang paling sering digunakan segmen ini. "
-            "Lakukan A/B testing pada fitur kunci dan kumpulkan feedback setelah rilis."
-        )
-    elif any(keyword in pref_lower for keyword in ["layanan", "service", "support"]):
-        recommendation = (
-            "Perkuat kualitas layanan: percepat respon customer support, siapkan panduan yang jelas, "
-            "dan bangun SOP layanan untuk kasus yang paling sering muncul pada segmen ini."
-        )
-    elif any(keyword in pref_lower for keyword in ["kecepatan", "respon", "waktu"]):
-        recommendation = (
-            "Fokus pada peningkatan kecepatan layanan dan waktu respon, misalnya dengan automasi proses, "
-            "optimasi alur kerja, dan monitoring SLA secara berkala."
-        )
-    else:
-        recommendation = (
-            "Lakukan wawancara singkat atau survei lanjutan khusus untuk segmen ini guna menggali "
-            "ekspektasi detail, lalu gunakan temuan tersebut sebagai dasar perbaikan produk."
-        )
-
-    # Insight final sebagai satu kalimat panjang yang mudah dibaca
-    summary = (
-        f"Segment {seg_id} → Masalah: {problem} "
-        f"→ Penyebab: {cause} "
-        f"→ Rekomendasi: {recommendation}"
-    )
-
-    return {
-        "segment_id": str(seg_id),
-        "problem": problem,
-        "cause": cause,
-        "recommendation": recommendation,
-        "summary": summary,
-        "satisfaction_status": status,
-    }
-
-
-def generate_recommendations(
-    segment_details: List[Dict[str, Any]],
-) -> List[Dict[str, str]]:
+def generate_segment_insights(
+    segments: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
     """
-    Engine insight / rekomendasi per segment (AI‑5, rule‑based):
+    Generate insight & rekomendasi berbasis SEGMENT RESPONDEN.
 
-    - Tidak ada insight global kosong; semuanya per segment.
-    - Setiap insight menyebut Segment dengan format:
-        Segment X → Masalah → Penyebab → Rekomendasi
+    Input: output dari `segment_respondents()`
+    Output: insight per segment (bukan global).
     """
-    if not segment_details:
+
+    if not segments:
         return []
 
-    insights: List[Dict[str, str]] = []
+    insights: List[Dict[str, Any]] = []
 
-    # Urutkan dari kepuasan terendah ke tertinggi
+    # Urutkan dari kepuasan TERENDAH → TERTINGGI
     sorted_segments = sorted(
-        segment_details, key=lambda s: float(s.get("satisfaction_percentage", 0.0))
+        segments, key=lambda s: float(s.get("avg_satisfaction", 0.0))
     )
 
     for seg in sorted_segments:
-        insights.append(_build_single_segment_insight(seg))
+        cluster_id = seg.get("cluster_id")
+        population = int(seg.get("population_count", 0))
+        avg_satisfaction = float(seg.get("avg_satisfaction", 0.0))
+        preferred_products = seg.get("preferred_products", [])
+
+        dominant_pref = _get_dominant_preference(preferred_products)
+
+        problem = _build_segment_problem(avg_satisfaction, population)
+        cause = (
+            f"Segmen ini paling dipengaruhi oleh preferensi '{dominant_pref}', "
+            "yang menjadi faktor utama dalam membentuk tingkat kepuasan responden."
+        )
+        recommendation = _build_segment_recommendation(
+            dominant_pref, avg_satisfaction
+        )
+
+        insights.append(
+            {
+                "segment_id": int(cluster_id) + 1,  # untuk tampilan (1-indexed)
+                "population": population,
+                "avg_satisfaction": round(avg_satisfaction, 2),
+                "dominant_preference": dominant_pref,
+                "problem": problem,
+                "cause": cause,
+                "recommendation": recommendation,
+                "summary": (
+                    f"Segment {int(cluster_id)+1} → Masalah: {problem} "
+                    f"→ Penyebab: {cause} "
+                    f"→ Rekomendasi: {recommendation}"
+                ),
+            }
+        )
 
     return insights
