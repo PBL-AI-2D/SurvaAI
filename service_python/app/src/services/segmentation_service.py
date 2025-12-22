@@ -69,7 +69,17 @@ def segment_respondents(
     random_state: int = 42,
 ) -> Dict[str, Any]:
     """
-    Segmentasi untuk mengetahui Pemetaan Produk per Segmen.
+    Segmentasi responden (AI-2).
+
+    - Input fitur SELALU per responden (n_responden x n_fitur):
+      * satisfaction_scores[i]  -> skor kepuasan responden ke-i (0-1)
+      * sentiment_scores[i]     -> skor sentimen responden ke-i (0-1)
+      * product_features[i][*]  -> fitur kategorikal one‑hot responden ke-i (0/1)
+
+    - Output utama:
+      * 'segments'  -> profil tiap cluster/segment (bukan per pertanyaan)
+      * 'pca_plot'  -> koordinat 2D per responden + cluster (mapping responden → segment)
+      * 'assignments' -> list cluster_id (1-indexed) per responden (index selaras dengan urutan input)
     """
     
     # 1. Build Data
@@ -84,13 +94,15 @@ def segment_respondents(
     
     # Validasi: jumlah sampel harus cukup untuk clustering
     if n_samples < 2:
-        # Tidak cukup sampel untuk clustering, return semua sebagai 1 cluster
+        # Tidak cukup sampel untuk clustering, kembalikan semua ke satu cluster
         pca_data_simple = []
         if n_samples == 1:
             pca_data_simple = [{"x": 0.0, "y": 0.0, "cluster": 0}]
         elif n_samples == 0:
             pca_data_simple = []
         
+        assignments = [1] * n_samples if n_samples == 1 else []
+
         return {
             "k_used": 1,
             "segments": [{
@@ -102,7 +114,8 @@ def segment_respondents(
                 "preferred_products": _analyze_cluster_affinity(df_features, product_cols) if n_samples > 0 else [],
                 "demographics_mode": {}
             }],
-            "pca_plot": pca_data_simple
+            "pca_plot": pca_data_simple,
+            "assignments": assignments,
         }
     
     # Pastikan k tidak lebih besar dari jumlah sampel
@@ -155,8 +168,8 @@ def segment_respondents(
     # 4. Analisis Per Segmen (Product Affinity)
     segments_profile = []
     
-    for c_id in sorted(df_clustered['cluster'].unique()):
-        subset = df_clustered[df_clustered['cluster'] == c_id]
+    for c_id in sorted(df_clustered["cluster"].unique()):
+        subset = df_clustered[df_clustered["cluster"] == c_id]
         
         # A. Hitung Rata-rata Kepuasan Segmen Ini
         avg_sat = float(subset['satisfaction'].mean())
@@ -184,29 +197,36 @@ def segment_respondents(
                     demo_summary[col] = subset_demo[col].mode()[0]
                 except: pass
 
-        segments_profile.append({
-            "cluster_id": int(c_id),
-            "label_name": segment_name,
-            "population_count": int(len(subset)),
-            "avg_satisfaction": round(avg_sat, 2),
-            "avg_sentiment": round(avg_sent, 2),
-            "preferred_products": liked_products, # <--- INI HASIL UTAMANYA
-            "demographics_mode": demo_summary
-        })
+        segments_profile.append(
+            {
+                "cluster_id": int(c_id),
+                "label_name": segment_name,
+                "population_count": int(len(subset)),
+                "avg_satisfaction": round(avg_sat, 2),
+                "avg_sentiment": round(avg_sent, 2),
+                "preferred_products": liked_products,  # hasil utama pemetaan preferensi
+                "demographics_mode": demo_summary,
+            }
+        )
 
     # 5. Output Visualisasi Scatter Plot
     pca = PCA(n_components=2)
     coords = pca.fit_transform(X_scaled)
-    # Convert cluster labels to 1-indexed untuk konsistensi dengan segment_id
+
+    # Mapping per responden ke segment (1‑indexed)
+    assignments: List[int] = [int(l) + 1 for l in cluster_labels]
+
+    # Data untuk scatter plot (per responden, cluster 1‑indexed)
     pca_data = [
-        {"x": float(c[0]), "y": float(c[1]), "cluster": int(l) + 1} 
-        for c, l in zip(coords, cluster_labels)
+        {"x": float(c[0]), "y": float(c[1]), "cluster": assign}
+        for c, assign in zip(coords, assignments)
     ]
 
     result = {
         "k_used": k,
         "segments": segments_profile,
-        "pca_plot": pca_data
+        "pca_plot": pca_data,
+        "assignments": assignments,
     }
     
     if k_analysis is not None:

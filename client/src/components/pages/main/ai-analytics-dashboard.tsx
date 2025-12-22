@@ -9,21 +9,34 @@ import { Bot, Download, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSurveySatisfactionAnalysis } from "@/features/survey/hooks/useSurveySatisfactionAnalysis";
 import { useUserSurvey } from "@/features/survey/hooks/useUserSurveys";
-import { generateAIInsightSummary, type SatisfactionData } from "@/utils/ai-insights";
-import { useMemo } from "react";
+import {
+  generateAIInsightSummary,
+  type SatisfactionData,
+} from "@/utils/ai-insights";
+import { useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
 interface AIAnalyticsDashboardProps {
   surveyId: string;
 }
 
 export function AIAnalyticsDashboard({ surveyId }: AIAnalyticsDashboardProps) {
+  const router = useRouter();
+
   // Fetch survey data to check if it has respondents
   const { data: survey } = useUserSurvey(surveyId);
-  const hasRespondents = survey && (typeof survey.jumlah_responden === 'number' ? survey.jumlah_responden > 0 : Number(survey.jumlah_responden) > 0);
-  
+  const hasRespondents =
+    survey &&
+    (typeof survey.jumlah_responden === "number"
+      ? survey.jumlah_responden > 0
+      : Number(survey.jumlah_responden) > 0);
+
   // Fetch satisfaction analysis for AI Insight Summary
-  const { data: satisfactionData } = useSurveySatisfactionAnalysis(surveyId, hasRespondents);
-  
+  const { data: satisfactionData } = useSurveySatisfactionAnalysis(
+    surveyId,
+    hasRespondents
+  );
+
   // Generate AI Insight Summary
   const aiInsightSummary = useMemo(() => {
     if (!satisfactionData) {
@@ -35,7 +48,7 @@ export function AIAnalyticsDashboard({ surveyId }: AIAnalyticsDashboardProps) {
       unsatisfied: satisfactionData.satisfaction_percentage.unsatisfied,
       total_respondents: satisfactionData.total_respondents,
       major_preference: satisfactionData.major_preference,
-      segments: satisfactionData.segments?.map(seg => ({
+      segments: satisfactionData.segments?.map((seg) => ({
         segment_id: seg.segment_id,
         satisfaction_percentage: seg.satisfaction_percentage,
         satisfaction_status: seg.satisfaction_status,
@@ -45,83 +58,200 @@ export function AIAnalyticsDashboard({ surveyId }: AIAnalyticsDashboardProps) {
     return generateAIInsightSummary(satisfactionDataForInsight);
   }, [satisfactionData]);
 
+  // Download report as structured PDF using jsPDF (berisi ringkasan analisis)
+  const handleDownloadPdf = useCallback(async () => {
+    if (typeof window === "undefined") return;
+
+    const jsPDFModule = await import("jspdf");
+    const JsPDF = (jsPDFModule as any).jsPDF || (jsPDFModule as any).default;
+
+    const pdf = new JsPDF("p", "mm", "a4");
+    const pageWidth = pdf.internal.pageSize.getWidth();
+
+    let y = 20;
+
+    // Title
+    pdf.setFontSize(18);
+    pdf.text("Survey Overview Report", pageWidth / 2, y, { align: "center" });
+    y += 10;
+
+    pdf.setFontSize(11);
+    pdf.text(`Survey ID: ${surveyId}`, 14, y);
+    y += 8;
+
+    // AI Insight Summary
+    if (aiInsightSummary) {
+      pdf.setFontSize(13);
+      pdf.text("AI Insight Summary", 14, y);
+      y += 6;
+
+      pdf.setFontSize(10);
+      const insightLines = pdf.splitTextToSize(
+        aiInsightSummary,
+        pageWidth - 28
+      );
+      pdf.text(insightLines, 14, y);
+      y += insightLines.length * 5 + 4;
+    }
+
+    // Satisfaction overview
+    if (satisfactionData) {
+      pdf.setFontSize(13);
+      pdf.text("Satisfaction & Preference Overview", 14, y);
+      y += 6;
+
+      pdf.setFontSize(10);
+      pdf.text(
+        `Total respondents: ${satisfactionData.total_respondents}`,
+        14,
+        y
+      );
+      y += 5;
+      pdf.text(
+        `Satisfied: ${satisfactionData.satisfaction_percentage.satisfied.toFixed(
+          1
+        )}%`,
+        14,
+        y
+      );
+      y += 5;
+      pdf.text(
+        `Neutral: ${satisfactionData.satisfaction_percentage.neutral.toFixed(
+          1
+        )}%`,
+        14,
+        y
+      );
+      y += 5;
+      pdf.text(
+        `Unsatisfied: ${satisfactionData.satisfaction_percentage.unsatisfied.toFixed(
+          1
+        )}%`,
+        14,
+        y
+      );
+      y += 8;
+
+      if (satisfactionData.major_preference) {
+        pdf.text(
+          `Major preference: ${satisfactionData.major_preference}`,
+          14,
+          y
+        );
+        y += 8;
+      }
+
+      // Segmentation overview (ringkas)
+      if (satisfactionData.segments && satisfactionData.segments.length > 0) {
+        pdf.setFontSize(13);
+        pdf.text("AI Respondent Segmentation", 14, y);
+        y += 6;
+
+        pdf.setFontSize(10);
+        satisfactionData.segments.slice(0, 4).forEach((seg, index) => {
+          if (y > 270) {
+            pdf.addPage();
+            y = 20;
+          }
+          pdf.text(
+            `Segment ${seg.segment_id}: ${
+              seg.satisfaction_status
+            } - ${seg.satisfaction_percentage.toFixed(1)}% satisfaction (${
+              seg.respondent_count
+            } respondents)`,
+            14,
+            y
+          );
+          y += 5;
+        });
+      }
+    }
+
+    pdf.save(`survey-report-${surveyId}.pdf`);
+  }, [surveyId, aiInsightSummary, satisfactionData]);
+
+  const handleReturnToExplore = useCallback(() => {
+    router.push("/explore");
+  }, [router]);
+
   return (
     <main className="flex flex-col w-full overflow-hidden min-h-screen pt-16 pb-5 md:px-10 px-5">
       <NavUmum />
 
       <section className="flex flex-col flex-grow">
         <div className="font-bold my-4">
-          <h1 className="text-3xl md:text-4xl ">
-            Overview Survey
-          </h1>
+          <h1 className="text-3xl md:text-4xl ">Overview Survey</h1>
           <p className="block text-xs text-foreground/80 italic">
-            Survey ID:{' '}
-            <span className="not-italic">{surveyId}</span>
+            Survey ID: <span className="not-italic">{surveyId}</span>
           </p>
           <SurveyBreadcrumbNav surveyId={surveyId} />
         </div>
-            <div className="bg-[var(--glass-bg)] border border-[var(--border)] rounded-xl p-6 shadow-lg space-y-8 ">
-              {/* AI Insight Summary Banner */}
-              <div
-                className="rounded-lg p-4 text-white"
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--color-primary-1) 0%, var(--color-primary-2) 50%, var(--color-primary-3) 100%)",
-                }}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="flex-shrink-0">
-                    <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-                      <Bot className="w-8 h-8 text-white" />
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <h2 className="text-xl font-semibold mb-2">
-                      AI Insight Summary
-                    </h2>
-                    <p className="text-sm opacity-90 leading-relaxed">
-                      {aiInsightSummary || "Belum ada data survei terbaru untuk dianalisis. Tunggu hingga ada responden yang menyelesaikan survei."}
-                    </p>
-                  </div>
+        <div className="bg-[var(--glass-bg)] border border-[var(--border)] rounded-xl p-6 shadow-lg space-y-8 ">
+          {/* AI Insight Summary Banner */}
+          <div
+            data-ai-insight-banner
+            className="rounded-lg p-4 text-white"
+            style={{
+              background:
+                "linear-gradient(135deg, var(--color-primary-1) 0%, var(--color-primary-2) 50%, var(--color-primary-3) 100%)",
+            }}
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                  <Bot className="w-8 h-8 text-white" />
                 </div>
               </div>
-
-              {/* AI Analysis Survey Section */}
-              <AIAnalysisSurveySection surveyId={surveyId} />
-
-              {/* AI Segmentation Respondent Section */}
-              <AISegmentationSection surveyId={surveyId} />
-
-              {/* Dashboard Analytic Overview Section */}
-              <DashboardAnalyticSection surveyId={surveyId} />
-
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t border-border">
-              <div className="flex items-center gap-4">
-                <Button
-                  size="lg"
-                  className="text-white"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, #2563EB 0%, #3B82F6 100%)",
-                  }}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Full Report (PDF)
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Return to Explore
-                </Button>
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Powered by SurvaAnalytics AI Engine - Preference and Sentiment
-                Intelligence System
+              <div className="flex-1">
+                <h2 className="text-xl font-semibold mb-2">
+                  AI Insight Summary
+                </h2>
+                <p className="text-sm opacity-90 leading-relaxed">
+                  {aiInsightSummary ||
+                    "Belum ada data survei terbaru untuk dianalisis. Tunggu hingga ada responden yang menyelesaikan survei."}
+                </p>
               </div>
             </div>
+          </div>
+
+          {/* AI Analysis Survey Section */}
+          <AIAnalysisSurveySection surveyId={surveyId} />
+
+          {/* AI Segmentation Respondent Section */}
+          <AISegmentationSection surveyId={surveyId} />
+
+          {/* Dashboard Analytic Overview Section */}
+          <DashboardAnalyticSection surveyId={surveyId} />
+
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t border-border">
+            <div className="flex items-center gap-4">
+              <Button
+                size="lg"
+                className="text-white"
+                onClick={handleDownloadPdf}
+                style={{
+                  background:
+                    "linear-gradient(135deg, #2563EB 0%, #3B82F6 100%)",
+                }}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Full Report (PDF)
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={handleReturnToExplore}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Return to Explore
+              </Button>
             </div>
+            <div className="text-sm text-muted-foreground">
+              Powered by SurvaAnalytics AI Engine - Preference and Sentiment
+              Intelligence System
+            </div>
+          </div>
+        </div>
       </section>
     </main>
   );

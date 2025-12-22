@@ -62,6 +62,8 @@ class SegmentationData(BaseModel):
     pca_2d: List[Dict[str, Any]]
     segment_details: List[SegmentDetail]
     k_analysis: Optional[Dict[str, Any]] = None
+    # mapping responden → segment (1‑indexed, index selaras dengan urutan responses)
+    assignments: List[int]
 
 
 class AnalyticsOverview(BaseModel):
@@ -79,12 +81,22 @@ class ChartData(BaseModel):
     likert_correlation: Dict[str, Dict[str, float]]
 
 
+class SegmentInsight(BaseModel):
+    segment_id: str
+    problem: str
+    cause: str
+    recommendation: str
+    summary: str
+    satisfaction_status: str
+
+
 class DashboardData(BaseModel):
     ai_insight_summary: AIInsightSummary
     satisfaction_overview: SatisfactionOverview
     segmentation: SegmentationData
     analytics_overview: AnalyticsOverview
     chart_data: ChartData
+    segment_insights: List[SegmentInsight]
 
 
 class DashboardResponse(BaseModel):

@@ -5,6 +5,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 import logging
 import time
 
@@ -19,14 +20,18 @@ console_handler.setLevel(logging.INFO)
 
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 file_handler.setFormatter(formatter)
+console_handler.setFormatter(formatter)
 
 logger.addHandler(file_handler)
+logger.addHandler(console_handler)
 
 @pytest.fixture(scope="module")
 def driver():
-    logger.info(f"\nStarting the test \n{'='*3}\n03-dapat-mengelola-kalkulasi-harga-survei.py\n{'='*3}")
+    logger.info("\n%s\nStarting the test\n%s\n03-dapat-mengelola-kalkulasi-harga-survei.py\n%s", 
+                '='*60, '='*60, '='*60)
     options = webdriver.ChromeOptions()
     options.add_argument('--incognito')  # Enable incognito mode
+    options.add_argument('--disable-blink-features=AutomationControlled')
 
     driver = webdriver.Chrome(options=options)
     driver.maximize_window()
@@ -37,7 +42,8 @@ def driver():
 @pytest.fixture
 def login(driver):
     """Helper fixture to login and return the driver."""
-    login_url = 'https://student-project.id/login'
+    logger.info("Navigating to login page...")
+    login_url = 'http://localhost:3000/login'
     driver.get(login_url)
 
     WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.NAME, 'email')))
@@ -45,10 +51,11 @@ def login(driver):
     password_field = driver.find_element(By.NAME, 'password')
     login_button = driver.find_element(By.XPATH, '//button[@type="submit"]')
 
-    email_field.send_keys('') # <-- Modify the value with real email
-    password_field.send_keys('') # <-- Modify the value with real password
+    email_field.send_keys('umum@email.com')  # <-- Modify the value with real email
+    password_field.send_keys('12345678')  # <-- Modify the value with real password
     login_button.click()
 
+    WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, '//a[@href="/manage-survey"]')))
     logger.info("Login successful.")
     return driver
 
@@ -118,16 +125,16 @@ def test_configuring_survey_price(login):
         price_per_respondent_displayed = driver.find_element(By.XPATH, "//label[text()='Price per Respondent']/following-sibling::div").text
         price_per_duration_displayed = driver.find_element(By.XPATH, "//label[text()='Price per Duration (days)']/following-sibling::div").text
 
-        assert base_price_displayed == format_price(base_price), f"Base Price not updated correctly, found: {base_price_displayed}"
-        assert price_per_question_displayed == format_price(price_per_question), f"Price per Question not updated correctly, found: {price_per_question_displayed}"
-        assert price_per_respondent_displayed == format_price(price_per_respondent), f"Price per Respondent not updated correctly, found: {price_per_respondent_displayed}"
-        assert price_per_duration_displayed == format_price(price_per_duration), f"Price per Duration not updated correctly, found: {price_per_duration_displayed}"
+        assert base_price_displayed == format_price(base_price), "Base Price not updated correctly, found: %s" % base_price_displayed
+        assert price_per_question_displayed == format_price(price_per_question), "Price per Question not updated correctly, found: %s" % price_per_question_displayed
+        assert price_per_respondent_displayed == format_price(price_per_respondent), "Price per Respondent not updated correctly, found: %s" % price_per_respondent_displayed
+        assert price_per_duration_displayed == format_price(price_per_duration), "Price per Duration not updated correctly, found: %s" % price_per_duration_displayed
 
         logger.info("All prices updated correctly.")
 
 
         time.sleep(5)
 
-    except Exception as e:
-        logger.error(f"Test failed due to error: {e}")
-        pytest.fail(f"Terjadi kesalahan: {e}")
+    except (TimeoutException, AssertionError, ValueError) as e:
+        logger.error("Test failed due to error: %s", e)
+        pytest.fail("Terjadi kesalahan: %s" % e)

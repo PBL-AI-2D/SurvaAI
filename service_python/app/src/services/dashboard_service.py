@@ -6,10 +6,10 @@ import pandas as pd
 # Import services dengan relative import
 from .satisfaction_analysis_service import analyze_satisfaction
 from .segmentation_service import segment_respondents
-from .eti_service import calculate_eti_score, predict_trend_from_eti
+
 try:
     from .recommendation_service import generate_recommendations
-except ImportError:
+except ImportError:  # pragma: no cover - defensive fallback
     # Fallback jika recommendation_service tidak ada
     generate_recommendations = None
 
@@ -204,26 +204,38 @@ def _extract_preference_from_categorical(
     return sorted_prefs
 
 
-def _calculate_trend_from_eti(
-    sentiment_scores: List[float],
+def _calculate_trend_from_satisfaction(
     satisfaction_scores: List[float],
 ) -> str:
-    """Hitung trend dari ETI score sederhana."""
-    try:
-        eti_scores = calculate_eti_score(
-            sentiment_scores=sentiment_scores,
-            satisfaction_scores=satisfaction_scores,
-        )
-        avg_eti = np.mean(eti_scores)
-        
-        if avg_eti > 0.7:
-            return "positive"
-        elif avg_eti < 0.4:
-            return "negative"
-        else:
-            return "stable"
-    except Exception:
+    """
+    Hitung trend sederhana berbasis perubahan rata‑rata kepuasan (AI‑3).
+
+    - Tidak menggunakan ARIMA / LSTM / forecasting berat.
+    - Menganggap urutan skor sudah merefleksikan urutan waktu pengisian.
+    - Bandingkan rata‑rata awal vs akhir:
+        * > +0.05  → "positive"
+        * < -0.05  → "negative"
+        * lainnya  → "stable"
+    """
+    if not satisfaction_scores or len(satisfaction_scores) < 2:
         return "stable"
+
+    scores = np.array(satisfaction_scores, dtype=float)
+
+    # Bagi menjadi dua bagian (awal & akhir) sebagai pendekatan tren sederhana
+    mid = len(scores) // 2
+    first_half = scores[:max(1, mid)]
+    second_half = scores[max(1, mid):]
+
+    avg_first = float(np.mean(first_half))
+    avg_second = float(np.mean(second_half))
+    diff = avg_second - avg_first
+
+    if diff > 0.05:
+        return "positive"
+    if diff < -0.05:
+        return "negative"
+    return "stable"
 
 
 def _calculate_segment_details(
@@ -232,7 +244,13 @@ def _calculate_segment_details(
     categorical_features: Optional[List[Dict[str, Any]]],
     pca_2d: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """Hitung detail per segment: avg age, dominant preference, satisfaction %."""
+    """
+    Hitung profil tiap segment (SETELAH clustering, bukan saat clustering):
+
+    - avg_satisfaction per segment
+    - dominant_preference & all_preferences (berbasis fitur kategorikal)
+    - respondent_count per segment
+    """
     df_segments = pd.DataFrame({
         "cluster": clusters,
         "satisfaction": satisfaction_scores,
@@ -475,7 +493,7 @@ def generate_dashboard_data(
     pca_plot = ai2_result.get("pca_plot", [])
     clusters = [point.get("cluster", 0) for point in pca_plot] if pca_plot else []
     
-    # Segment dengan highest satisfaction
+        # Segment dengan highest satisfaction
     segment_details = _calculate_segment_details(
         clusters=clusters,
         satisfaction_scores=satisfaction_scores,
@@ -490,6 +508,11 @@ def generate_dashboard_data(
     # Avg satisfaction dalam skala 0-10 (dari 0-1)
     avg_satisfaction_10 = round(np.mean(satisfaction_scores) * 10, 1) if satisfaction_scores else 0.0
     
+    # 6. Insight / rekomendasi berbasis SEGMENT (rule‑based, tekstual)
+    segment_insights = []
+    if generate_recommendations is not None and segment_details:
+        segment_insights = generate_recommendations(segment_details=segment_details)
+
     # Build response
     dashboard_data = {
         # AI Insight Summary
@@ -522,6 +545,8 @@ def generate_dashboard_data(
             "segment_details": segment_details,
             "k_analysis": ai2_result.get("k_analysis"),
             "segments": ai2_result.get("segments", []),
+            # mapping responden → segment (1‑indexed, urutan sama dengan responses)
+            "assignments": ai2_result.get("assignments", []),
         },
         
         # Dashboard Analytic Overview
@@ -529,8 +554,8 @@ def generate_dashboard_data(
             "total_respondents": total_respondents,
             "avg_satisfaction_10": avg_satisfaction_10,
             "active_segments": ai2_result["k_used"],
-            "satisfaction_trend": _calculate_trend_from_eti(
-                sentiment_scores, satisfaction_scores
+            "satisfaction_trend": _calculate_trend_from_satisfaction(
+                satisfaction_scores
             ),
         },
         
@@ -548,6 +573,9 @@ def generate_dashboard_data(
             "all_text_responses": all_text_responses,
             "total_text_responses": len(all_text_responses),
         },
+
+        # Insight / rekomendasi per segment (teks siap tampil)
+        "segment_insights": segment_insights,
     }
     
     return dashboard_data
