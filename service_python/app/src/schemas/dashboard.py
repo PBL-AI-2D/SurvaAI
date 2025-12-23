@@ -81,6 +81,19 @@ class ChartData(BaseModel):
     likert_correlation: Dict[str, Dict[str, float]]
 
 
+class FeatureExplanation(BaseModel):
+    feature: str
+    importance: str
+    description: str
+
+
+class ExplainabilityData(BaseModel):
+    top_features: List[FeatureExplanation]
+    average_satisfaction: float
+    sentiment_trend: str
+    respondent_count: int
+
+
 class SegmentInsight(BaseModel):
     segment_id: str
     problem: str
@@ -88,6 +101,11 @@ class SegmentInsight(BaseModel):
     recommendation: str
     summary: str
     satisfaction_status: str
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence score (0-1) based on similarity")
+    confidence_label: str = Field(description="Confidence label: High/Medium/Low")
+    reason: str = Field(description="Explanation for why this recommendation was made")
+    explainability: ExplainabilityData = Field(description="Explainability layer with top features and metrics")
+    low_confidence_warning: bool = Field(default=False, description="Warning flag if confidence < 0.6")
 
 
 class DashboardData(BaseModel):
@@ -97,6 +115,9 @@ class DashboardData(BaseModel):
     analytics_overview: AnalyticsOverview
     chart_data: ChartData
     segment_insights: List[SegmentInsight]
+    # Optional fields untuk data insufficient
+    data_insufficient: bool = Field(default=False, description="Flag jika data kurang dari minimum")
+    insufficient_message: Optional[str] = Field(default=None, description="Pesan jika data tidak cukup")
 
 
 class DashboardResponse(BaseModel):

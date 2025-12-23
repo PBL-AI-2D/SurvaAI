@@ -13,9 +13,14 @@ const startServer = async () => {
   const redisClient = await testRedisConnection();
   const emailTransporter = await testEmailConnection();
 
-  if (!dbConnected || !redisClient || !emailTransporter) {
-    console.error('❌ Server not started due to failed dependencies');
+  // Database dan Email wajib, tapi Redis bisa opsional (dengan warning)
+  if (!dbConnected || !emailTransporter) {
+    console.error('❌ Server not started due to failed dependencies (DB or Email)');
     process.exit(1);
+  }
+
+  if (!redisClient) {
+    console.warn('⚠️ Warning: Redis connection failed. Server will continue but refresh token features may not work properly.');
   }
 
   initializeCronJobs();

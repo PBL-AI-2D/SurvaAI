@@ -30,6 +30,39 @@ def _calculate_satisfaction_percentage(sentiment_dist: Dict[str, int], total: in
     }
 
 
+def _is_product_feature_question(question_text: str) -> bool:
+    """
+    Identifikasi apakah pertanyaan menanyakan tentang produk/features yang disukai.
+    Hanya pertanyaan tentang preferensi produk/features yang akan digunakan untuk segmentasi.
+    """
+    if not question_text:
+        return False
+    
+    question_lower = str(question_text).lower()
+    
+    # Kolom yang harus di-exclude (bukan preferensi produk/features)
+    exclude_keywords = ['age', 'id', 'nama', 'name', 'email', 'phone', 'tanggal', 'date', 
+                        'time', 'timestamp', 'created', 'updated', 'cluster',
+                        'kendala', 'masalah', 'problem', 'issue', 'complaint', 'keluhan',
+                        'saran', 'suggestion', 'feedback', 'komentar', 'comment']
+    
+    # Skip jika mengandung kata kunci exclude
+    if any(exclude_kw in question_lower for exclude_kw in exclude_keywords):
+        return False
+    
+    # Kata kunci yang menunjukkan pertanyaan tentang produk/features yang disukai
+    product_feature_keywords = [
+        'fitur', 'feature', 'produk', 'product',
+        'suka', 'disukai', 'favorit', 'favorite', 'paling', 'helpful', 'membantu',
+        'preferensi', 'preference', 'pilihan', 'choice', 'option',
+        'manfaat', 'benefit', 'keuntungan', 'advantage',
+        'yang menurut', 'yang anda', 'yang kamu', 'yang paling'
+    ]
+    
+    # Harus mengandung minimal satu kata kunci produk/features
+    return any(keyword in question_lower for keyword in product_feature_keywords)
+
+
 def _convert_categorical_to_product_features(
     categorical_features: List[Dict[str, Any]]
 ) -> List[Dict[str, int]]:
@@ -37,18 +70,33 @@ def _convert_categorical_to_product_features(
     Konversi categorical features menjadi product_features format One-Hot Encoding.
     Format output: List[Dict[str, int]] dimana setiap dict adalah one-hot untuk satu responden.
     Handle array values (checkbox) dan single values (radio/dropdown).
+    
+    PRIORITAS: 
+    1. Hanya menggunakan VALUE/JAWABAN sebagai key, BUKAN "question:answer"
+    2. Hanya mengambil produk/features yang disukai, bukan semua jawaban categorical
+    Contoh: "Segmentation" bukan "Fitur Apa Saja Yang Menurut Anda Paling Membantu?: Segmentation"
     """
     if not categorical_features:
         return []
     
-    # Collect all unique values across all categorical features untuk one-hot encoding
-    all_unique_values = {}
+    # Kolom yang harus di-exclude (bukan preferensi)
+    exclude_keywords = ['age', 'id', 'nama', 'name', 'email', 'phone', 'tanggal', 'date', 
+                        'time', 'timestamp', 'created', 'updated', 'cluster']
+    
+    # Collect all unique VALUES (jawaban) saja, HANYA dari pertanyaan produk/features
+    all_unique_values = set()
     for cat_dict in categorical_features:
         if not cat_dict or not isinstance(cat_dict, dict):
             continue
         for col_name, col_value in cat_dict.items():
-            if col_name not in all_unique_values:
-                all_unique_values[col_name] = set()
+            # Skip kolom yang jelas bukan preferensi
+            col_str = str(col_name).lower()
+            if any(exclude_kw in col_str for exclude_kw in exclude_keywords):
+                continue
+            
+            # PRIORITAS: Hanya ambil pertanyaan tentang produk/features yang disukai
+            if not _is_product_feature_question(col_name):
+                continue
             
             if col_value is None:
                 continue
@@ -57,31 +105,43 @@ def _convert_categorical_to_product_features(
             if isinstance(col_value, list):
                 for val in col_value:
                     if val is not None and val != "":
-                        all_unique_values[col_name].add(str(val))
+                        val_str = str(val).strip()
+                        if val_str:
+                            all_unique_values.add(val_str)
             elif isinstance(col_value, (dict, set)):
                 for val in col_value:
                     if val is not None and val != "":
-                        all_unique_values[col_name].add(str(val))
+                        val_str = str(val).strip()
+                        if val_str:
+                            all_unique_values.add(val_str)
             else:
                 # Single value
                 val_str = str(col_value).strip()
                 if val_str:
-                    all_unique_values[col_name].add(val_str)
+                    all_unique_values.add(val_str)
     
     # Build one-hot encoding untuk setiap responden
+    # Key hanya VALUE saja, bukan "question:value"
     product_features = []
     for cat_dict in categorical_features:
         row_dict = {}
         
-        # Initialize semua kolom dengan 0
-        for col_name, unique_values in all_unique_values.items():
-            for val in unique_values:
-                key = f"{str(col_name)}:{val}"
-                row_dict[key] = 0
+        # Initialize semua kolom dengan 0 (hanya value sebagai key)
+        for val in all_unique_values:
+            row_dict[val] = 0
         
         # Set 1 untuk nilai yang dipilih responden ini
         if cat_dict and isinstance(cat_dict, dict):
             for col_name, col_value in cat_dict.items():
+                # Skip kolom yang jelas bukan preferensi
+                col_str = str(col_name).lower()
+                if any(exclude_kw in col_str for exclude_kw in exclude_keywords):
+                    continue
+                
+                # PRIORITAS: Hanya ambil pertanyaan tentang produk/features yang disukai
+                if not _is_product_feature_question(col_name):
+                    continue
+                
                 if col_value is None:
                     continue
                 
@@ -90,25 +150,19 @@ def _convert_categorical_to_product_features(
                     for val in col_value:
                         if val is not None and val != "":
                             val_str = str(val).strip()
-                            if val_str:
-                                key = f"{str(col_name)}:{val_str}"
-                                if key in row_dict:
-                                    row_dict[key] = 1
+                            if val_str and val_str in row_dict:
+                                row_dict[val_str] = 1
                 elif isinstance(col_value, (dict, set)):
                     for val in col_value:
                         if val is not None and val != "":
                             val_str = str(val).strip()
-                            if val_str:
-                                key = f"{str(col_name)}:{val_str}"
-                                if key in row_dict:
-                                    row_dict[key] = 1
+                            if val_str and val_str in row_dict:
+                                row_dict[val_str] = 1
                 else:
                     # Single value
                     val_str = str(col_value).strip()
-                    if val_str:
-                        key = f"{str(col_name)}:{val_str}"
-                        if key in row_dict:
-                            row_dict[key] = 1
+                    if val_str and val_str in row_dict:
+                        row_dict[val_str] = 1
         
         product_features.append(row_dict)
     
@@ -120,9 +174,14 @@ def _extract_preference_from_categorical(
 ) -> Dict[str, float]:
     """
     Extract distribusi preferensi/pilihan dari categorical features.
-    Mengambil semua kolom categorical yang valid dan menghitung distribusinya.
+    HANYA mengambil produk/features yang disukai, bukan semua jawaban categorical.
     Handle array values (untuk checkbox) dan single values (untuk radio/dropdown).
     Filter kolom yang jelas bukan preferensi (seperti age, id, dll).
+    
+    PRIORITAS: 
+    1. Hanya return VALUE/JAWABAN saja, BUKAN "question:answer"
+    2. Hanya produk/features yang disukai, bukan semua jawaban
+    Contoh: {"Segmentation": 10.7} bukan {"Fitur Apa Saja Yang Menurut Anda Paling Membantu?: Segmentation": 10.7}
     """
     if not categorical_features:
         return {}
@@ -138,8 +197,8 @@ def _extract_preference_from_categorical(
                         'time', 'timestamp', 'created', 'updated', 'cluster']
     
     # Flatten array values dan hitung distribusi
-    # Struktur: {col_name: {value: count}}
-    col_value_counts = {}
+    # Struktur: {value: count} - HANYA VALUE, BUKAN "question:value"
+    value_counts = {}
     total_all_selections = 0  # Total semua pilihan yang dipilih (untuk normalisasi ke 100%)
     
     # Iterate through each categorical feature dict
@@ -153,13 +212,13 @@ def _extract_preference_from_categorical(
             if any(exclude_kw in col_str for exclude_kw in exclude_keywords):
                 continue
             
+            # PRIORITAS: Hanya ambil pertanyaan tentang produk/features yang disukai
+            if not _is_product_feature_question(col_name):
+                continue
+            
             # Skip jika nilai kosong atau None
             if col_value is None:
                 continue
-            
-            # Initialize tracking untuk kolom ini
-            if col_name not in col_value_counts:
-                col_value_counts[col_name] = {}
             
             # Handle array values (checkbox) dan single values (radio/dropdown)
             values_to_count = []
@@ -180,28 +239,26 @@ def _extract_preference_from_categorical(
                 if val_str:
                     values_to_count.append(val_str)
             
-            # Hitung distribusi untuk setiap nilai
+            # Hitung distribusi untuk setiap nilai (HANYA VALUE, BUKAN "question:value")
             for value in values_to_count:
-                if value not in col_value_counts[col_name]:
-                    col_value_counts[col_name][value] = 0
-                col_value_counts[col_name][value] += 1
+                if value not in value_counts:
+                    value_counts[value] = 0
+                value_counts[value] += 1
                 total_all_selections += 1
     
     # Konversi count ke persentase berdasarkan total semua pilihan (agar pie chart total = 100%)
-    preference_scores = {}
+    preferences_dict = {}
     if total_all_selections > 0:
-        for col_name, value_counts in col_value_counts.items():
-            for value, count in value_counts.items():
-                percentage = (count / total_all_selections) * 100
-                # Format display name: "Kolom: Nilai"
-                display_name = f"{str(col_name)}: {value}"
-                preference_scores[display_name] = round(percentage, 1)
+        for value, count in value_counts.items():
+            # Key: hanya value, bukan "col_name: value"
+            percentage = (count / total_all_selections) * 100
+            preferences_dict[value] = percentage
     
-    # Filter out nilai dengan persentase 0 dan sort by score descending
-    filtered_prefs = {k: v for k, v in preference_scores.items() if v > 0}
-    sorted_prefs = dict(sorted(filtered_prefs.items(), key=lambda x: x[1], reverse=True))
+    # Sort berdasarkan persentase tertinggi
+    sorted_preferences = sorted(preferences_dict.items(), key=lambda x: x[1], reverse=True)
     
-    return sorted_prefs
+    # Return top preferences (max 20 untuk menghindari terlalu banyak)
+    return {pref: pct for pref, pct in sorted_preferences[:20]}
 
 
 def _calculate_trend_from_satisfaction(
@@ -283,6 +340,7 @@ def _calculate_segment_details(
                               'time', 'timestamp', 'created', 'updated', 'cluster']
             
             # Cari kolom preferensi dengan nilai tertinggi
+            # PRIORITAS: Hanya ambil pertanyaan tentang produk/features yang disukai
             pref_cols = []
             for col in cluster_cat.columns:
                 if col == "cluster":
@@ -290,6 +348,9 @@ def _calculate_segment_details(
                 col_str = str(col).lower()
                 # Skip kolom yang jelas bukan preferensi
                 if any(exclude_kw in col_str for exclude_kw in exclude_keywords):
+                    continue
+                # Hanya ambil pertanyaan tentang produk/features yang disukai
+                if not _is_product_feature_question(col):
                     continue
                 pref_cols.append(col)
             
@@ -323,11 +384,11 @@ def _calculate_segment_details(
                                     total_count = len(all_values)
                                     if total_count > 0:
                                         percentage = (most_common_count / total_count)
-                                        # Format: hanya nilai, tanpa nama kolom jika terlalu panjang
-                                        if len(most_common_value) <= 30:
-                                            pref_scores_dict[f"{col}: {most_common_value}"] = percentage
-                                        else:
-                                            pref_scores_dict[most_common_value[:30]] = percentage
+                                        # PRIORITAS: Hanya nilai/jawaban saja, BUKAN "question: answer"
+                                        # Truncate jika terlalu panjang
+                                        if len(most_common_value) > 40:
+                                            most_common_value = most_common_value[:37] + "..."
+                                        pref_scores_dict[most_common_value] = percentage
                     except (TypeError, ValueError):
                         continue
                 
@@ -335,12 +396,8 @@ def _calculate_segment_details(
                     # Sort dan ambil yang tertinggi
                     sorted_prefs = sorted(pref_scores_dict.items(), key=lambda x: x[1], reverse=True)
                     if len(sorted_prefs) > 0 and sorted_prefs[0][1] > 0:
-                        pref_key = str(sorted_prefs[0][0])
-                        # Format: jika ada ":", ambil bagian setelah ":" saja
-                        if ": " in pref_key:
-                            dominant_preference = pref_key.split(": ", 1)[1].strip()
-                        else:
-                            dominant_preference = pref_key.replace("_", " ").title()
+                        # PRIORITAS: pref_key sudah hanya value saja, bukan "question: value"
+                        dominant_preference = str(sorted_prefs[0][0]).strip()
                         # Truncate jika terlalu panjang
                         if len(dominant_preference) > 40:
                             dominant_preference = dominant_preference[:37] + "..."
@@ -371,11 +428,9 @@ def _calculate_segment_details(
         all_preferences_list = []
         if pref_scores_dict:
             sorted_prefs = sorted(pref_scores_dict.items(), key=lambda x: x[1], reverse=True)
-            for pref_key, pref_score in sorted_prefs[:3]:  # Top 3 preferences
-                if ": " in pref_key:
-                    pref_value = pref_key.split(": ", 1)[1].strip()
-                else:
-                    pref_value = pref_key.replace("_", " ").title()
+            for pref_key, _ in sorted_prefs[:3]:  # Top 3 preferences
+                # PRIORITAS: pref_key sudah hanya value saja, bukan "question: value"
+                pref_value = str(pref_key).strip()
                 if len(pref_value) > 30:
                     pref_value = pref_value[:27] + "..."
                 all_preferences_list.append(pref_value)
@@ -408,6 +463,55 @@ def generate_dashboard_data(
     Returns:
         Dictionary dengan struktur sesuai kebutuhan dashboard frontend.
     """
+    # PRIORITAS 4 - MINIMUM DATA CHECK
+    if len(responses) < 5:
+        # Return early dengan pesan bahwa data belum cukup
+        return {
+            "ai_insight_summary": {
+                "satisfaction_percentage": {"satisfied": 0.0, "neutral": 0.0, "unsatisfied": 0.0},
+                "major_preference": {"name": "N/A", "percentage": 0.0},
+                "highest_segment": {"segment_id": None, "satisfaction_percentage": 0.0},
+            },
+            "satisfaction_overview": {
+                "total_respondents": len(responses),
+                "satisfaction_distribution": {"positive": 0, "negative": 0, "neutral": 0},
+                "satisfaction_percentage": {"satisfied": 0.0, "neutral": 0.0, "unsatisfied": 0.0},
+                "avg_satisfaction_10": 0.0,
+                "preferences": {},
+            },
+            "segmentation": {
+                "total_segments": 0,
+                "clusters": [],
+                "pca_2d": [],
+                "segment_details": [],
+                "k_analysis": None,
+                "segments": [],
+                "assignments": [],
+            },
+            "analytics_overview": {
+                "total_respondents": len(responses),
+                "avg_satisfaction_10": 0.0,
+                "active_segments": 0,
+                "satisfaction_trend": "stable",
+            },
+            "chart_data": {
+                "satisfaction_scores": [],
+                "sentiment_scores": [],
+                "sentiment_labels": [],
+                "likert_normalized": [],
+                "likert_correlation": {},
+            },
+            "text_analysis": {
+                "all_text_responses": [],
+                "total_text_responses": 0,
+            },
+            "segment_insights": [],
+            "data_insufficient": True,
+            "insufficient_message": f"Data belum cukup untuk analisis AI. Minimal diperlukan 5 responden, saat ini hanya ada {len(responses)} responden.",
+        }
+    
+    # Continue dengan normal flow jika data cukup
+    
     # 1. Jalankan AI-1: Analisis Kepuasan
     ai1_result = analyze_satisfaction(
         responses=responses,
@@ -456,7 +560,23 @@ def generate_dashboard_data(
             categorical_features.append({})
     
     # Konversi categorical_features ke product_features (One-Hot Encoding)
+    # PRIORITAS 1 - Product Feature Mapping = 1 Responden = 1 Vektor
     product_features = _convert_categorical_to_product_features(categorical_features)
+    
+    # Validasi: Pastikan jumlah product_features sama dengan jumlah responden
+    if len(product_features) != len(responses):
+        raise ValueError(
+            f"Product features mapping error: expected {len(responses)} vectors, "
+            f"got {len(product_features)}. Each respondent must have exactly one feature vector."
+        )
+    
+    # Debug: Validasi bahwa setiap responden punya vektor sendiri
+    for i, pf in enumerate(product_features):
+        if not isinstance(pf, dict):
+            raise ValueError(
+                f"Product feature at index {i} is not a dictionary. "
+                f"Each respondent must have a dict of one-hot encoded features."
+            )
     
     # 2. Jalankan AI-2: Segmentasi
     ai2_result = segment_respondents(
@@ -510,8 +630,13 @@ def generate_dashboard_data(
     
     # 6. Insight / rekomendasi berbasis SEGMENT (rule‑based, tekstual)
     segment_insights = []
-    if generate_recommendations is not None and segment_details:
-        segment_insights = generate_recommendations(segment_details=segment_details)
+    if generate_recommendations is not None and segment_details and len(segment_details) > 0:
+        try:
+            segment_insights = generate_recommendations(segment_details=segment_details)
+        except Exception as e:
+            # Log error tapi jangan sampai mematahkan seluruh dashboard
+            print(f"Warning: Error generating segment insights: {str(e)}")
+            segment_insights = []
 
     # Build response
     dashboard_data = {

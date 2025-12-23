@@ -1,5 +1,5 @@
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../../utils/jwt.js';
-import redis from '../../config/redis.js';
+import redis, { safeRedisOperation } from '../../config/redis.js';
 import db from '../../models/index.js';
 const { Pengguna } = db;
 import bcrypt from 'bcrypt';
@@ -20,7 +20,13 @@ export const userLogin = async (email, password) => {
   const accessToken = generateAccessToken(user.id, user.role);
   const refreshToken = generateRefreshToken(user.id, user.role, tokenId);
 
-  await redis.set(`refresh:${tokenId}`, user.id, { EX: 30 * 24 * 60 * 60 });
+  // Safe Redis operation dengan error handling
+  await safeRedisOperation(
+    async () => {
+      await redis.set(`refresh:${tokenId}`, user.id, { EX: 30 * 24 * 60 * 60 });
+    },
+    null // Fallback: jika Redis gagal, tetap return token (tapi refresh token tidak akan bisa digunakan)
+  );
 
   return { accessToken, refreshToken };
 };
@@ -37,18 +43,33 @@ export const userRefresh = async (refreshTokenCookie) => {
     throw { status: 403, message: 'Invalid refresh token' };
   }
 
-  const exists = await redis.get(`refresh:${payload.tokenId}`);
+  // Safe Redis operation
+  const exists = await safeRedisOperation(
+    async () => await redis.get(`refresh:${payload.tokenId}`),
+    null // Fallback: jika Redis gagal, anggap token tidak valid
+  );
+
   if (!exists) {
     throw { status: 403, message: 'Refresh token expired or reused' };
   }
 
-  await redis.del(`refresh:${payload.tokenId}`);
+  // Safe delete
+  await safeRedisOperation(
+    async () => await redis.del(`refresh:${payload.tokenId}`),
+    null
+  );
 
   const newTokenId = uuidv4();
   const newRefreshToken = generateRefreshToken(payload.userId, payload.role, newTokenId);
   const newAccessToken = generateAccessToken(payload.userId, payload.role);
 
-  await redis.set(`refresh:${newTokenId}`, payload.userId, { EX: 30 * 24 * 60 * 60 });
+  // Safe set
+  await safeRedisOperation(
+    async () => {
+      await redis.set(`refresh:${newTokenId}`, payload.userId, { EX: 30 * 24 * 60 * 60 });
+    },
+    null
+  );
 
   return { accessToken: newAccessToken, refreshToken: newRefreshToken };
 };
@@ -57,5 +78,10 @@ export const userLogout = async (refreshToken) => {
   if (!refreshToken) throw { status: 401, message: 'No active session' };
 
   const { tokenId } = verifyRefreshToken(refreshToken);
-  await redis.del(`refresh:${tokenId}`);
+  
+  // Safe delete
+  await safeRedisOperation(
+    async () => await redis.del(`refresh:${tokenId}`),
+    null
+  );
 };

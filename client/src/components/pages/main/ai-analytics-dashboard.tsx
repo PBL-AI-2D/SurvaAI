@@ -3,9 +3,10 @@
 import { AIAnalysisSurveySection } from "./ai-analysis-survey-section";
 import { AISegmentationSection } from "./ai-segmentation-section";
 import { DashboardAnalyticSection } from "./dashboard-analytic-section";
+
 import { SurveyBreadcrumbNav } from "@/components/umum/breadcrumb-survey";
 import { NavUmum } from "@/components/umum/nav-umum";
-import { Bot, Download, ArrowLeft } from "lucide-react";
+import { Bot, Download, ArrowLeft, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSurveySatisfactionAnalysis } from "@/features/survey/hooks/useSurveySatisfactionAnalysis";
 import { useUserSurvey } from "@/features/survey/hooks/useUserSurveys";
@@ -32,10 +33,14 @@ export function AIAnalyticsDashboard({ surveyId }: AIAnalyticsDashboardProps) {
       : Number(survey.jumlah_responden) > 0);
 
   // Fetch satisfaction analysis for AI Insight Summary
-  const { data: satisfactionData } = useSurveySatisfactionAnalysis(
-    surveyId,
-    hasRespondents
-  );
+  const {
+    data: satisfactionData,
+    isLoading: isLoadingSatisfaction,
+    isError: isErrorSatisfaction,
+  } = useSurveySatisfactionAnalysis(surveyId, hasRespondents);
+  
+  // Check if data is insufficient
+  const isDataInsufficient = satisfactionData?.data_insufficient || false;
 
   // Generate AI Insight Summary
   const aiInsightSummary = useMemo(() => {
@@ -163,6 +168,63 @@ export function AIAnalyticsDashboard({ surveyId }: AIAnalyticsDashboardProps) {
             y
           );
           y += 5;
+        });
+        y += 4;
+      }
+
+      // Segment-Specific Insights & Recommendations
+      if (
+        satisfactionData.segment_insights &&
+        satisfactionData.segment_insights.length > 0
+      ) {
+        if (y > 250) {
+          pdf.addPage();
+          y = 20;
+        }
+
+        pdf.setFontSize(13);
+        pdf.text("Segment-Specific Insights & Recommendations", 14, y);
+        y += 6;
+
+        pdf.setFontSize(10);
+        satisfactionData.segment_insights.forEach((insight) => {
+          if (y > 270) {
+            pdf.addPage();
+            y = 20;
+          }
+
+          // Segment header
+          pdf.setFontSize(11);
+          pdf.setFont(undefined, "bold");
+          pdf.text(`Segment ${insight.segment_id}`, 14, y);
+          y += 5;
+
+          pdf.setFontSize(10);
+          pdf.setFont(undefined, "normal");
+
+          // Problem
+          const problemLines = pdf.splitTextToSize(
+            `Problem: ${insight.problem}`,
+            pageWidth - 28
+          );
+          pdf.text(problemLines, 14, y);
+          y += problemLines.length * 5 + 2;
+
+          // Cause
+          const causeLines = pdf.splitTextToSize(
+            `Cause: ${insight.cause}`,
+            pageWidth - 28
+          );
+          pdf.text(causeLines, 14, y);
+          y += causeLines.length * 5 + 2;
+
+          // Recommendation
+          const recLines = pdf.splitTextToSize(
+            `Recommendation: ${insight.recommendation}`,
+            pageWidth - 28
+          );
+          pdf.text(recLines, 14, y);
+          y += recLines.length * 5 + 4;
         });
       }
     }

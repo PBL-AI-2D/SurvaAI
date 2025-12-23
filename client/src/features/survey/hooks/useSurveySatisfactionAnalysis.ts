@@ -86,6 +86,36 @@ export const useSurveySatisfactionAnalysis = (
       // Transform Python service response to our format
       const pythonData = classificationResult.data;
       
+      // Check if data is insufficient (minimum data check)
+      if (pythonData.data_insufficient) {
+        console.warn("Insufficient data for AI analysis:", pythonData.insufficient_message);
+        // Return early with warning message
+        return {
+          total_respondents: pythonData.satisfaction_overview?.total_respondents || 0,
+          satisfaction_percentage: {
+            satisfied: 0,
+            neutral: 0,
+            unsatisfied: 0,
+          },
+          average_satisfaction: 0,
+          sentiment_distribution: {
+            positive: 0,
+            negative: 0,
+            neutral: 0,
+          },
+          satisfaction_scores: [],
+          segments: [],
+          pca_2d: [],
+          preferences: {},
+          correlations: {},
+          text_responses: [],
+          total_text_responses: 0,
+          segment_insights: [],
+          data_insufficient: true,
+          insufficient_message: pythonData.insufficient_message || "Data belum cukup untuk analisis AI",
+        };
+      }
+      
       // Safe access to sentiment_distribution with fallback
       let sentimentDist = pythonData.satisfaction_overview?.sentiment_distribution;
       
@@ -155,6 +185,30 @@ export const useSurveySatisfactionAnalysis = (
           : undefined,
         text_responses: pythonData.text_analysis?.all_text_responses || [],
         total_text_responses: pythonData.text_analysis?.total_text_responses || 0,
+        segment_insights: Array.isArray(pythonData.segment_insights) 
+          ? pythonData.segment_insights.map((insight: any) => ({
+              segment_id: String(insight.segment_id || ""),
+              problem: String(insight.problem || ""),
+              cause: String(insight.cause || ""),
+              recommendation: String(insight.recommendation || ""),
+              summary: String(insight.summary || ""),
+              satisfaction_status: (insight.satisfaction_status || "medium") as "high" | "medium" | "low",
+              confidence: typeof insight.confidence === "number" ? insight.confidence : undefined,
+              confidence_label: insight.confidence_label || undefined,
+              reason: insight.reason || undefined,
+              explainability: insight.explainability ? {
+                top_features: (insight.explainability.top_features || []).map((f: any) => ({
+                  feature: String(f.feature || ""),
+                  importance: String(f.importance || ""),
+                  description: String(f.description || ""),
+                })),
+                average_satisfaction: Number(insight.explainability.average_satisfaction || 0),
+                sentiment_trend: String(insight.explainability.sentiment_trend || "stable"),
+                respondent_count: Number(insight.explainability.respondent_count || 0),
+              } : undefined,
+              low_confidence_warning: Boolean(insight.low_confidence_warning || false),
+            }))
+          : [],
       };
     },
     enabled: enabled && !!surveyId,

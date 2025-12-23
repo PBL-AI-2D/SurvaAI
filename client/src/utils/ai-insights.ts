@@ -44,12 +44,16 @@ export function generateAIInsightSummary(satisfactionData: SatisfactionData | nu
 
   const { satisfied, neutral, unsatisfied, total_respondents, major_preference, segments } = satisfactionData;
   
-  const satisfiedPct = ((satisfied / total_respondents) * 100).toFixed(1);
-  const neutralPct = ((neutral / total_respondents) * 100).toFixed(1);
-  const unsatisfiedPct = ((unsatisfied / total_respondents) * 100).toFixed(1);
+  // PRIORITAS 2 & 8 - Clamp persentase ke range 0-100%
+  // satisfied, neutral, unsatisfied sudah dalam bentuk persentase (0-100) dari backend
+  // Jangan hitung ulang, langsung clamp dan format
+  const satisfiedPct = Math.min(Math.max(Number(satisfied) || 0, 0), 100).toFixed(1);
+  const neutralPct = Math.min(Math.max(Number(neutral) || 0, 0), 100).toFixed(1);
+  const unsatisfiedPct = Math.min(Math.max(Number(unsatisfied) || 0, 0), 100).toFixed(1);
 
   // Determine trend (simplified - in real implementation, compare with previous period)
-  const satisfactionRatio = satisfied / total_respondents;
+  // satisfied sudah dalam persentase (0-100), jadi bagi 100 untuk dapat ratio (0-1)
+  const satisfactionRatio = (Number(satisfied) || 0) / 100;
   let trend = "stabil";
   if (satisfactionRatio >= 0.6) {
     trend = "meningkat";

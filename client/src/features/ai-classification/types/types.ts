@@ -36,6 +36,33 @@ export interface PCAPoint {
   cluster: number;
 }
 
+export interface FeatureExplanation {
+  feature: string;
+  importance: string;
+  description: string;
+}
+
+export interface ExplainabilityData {
+  top_features: FeatureExplanation[];
+  average_satisfaction: number;
+  sentiment_trend: string;
+  respondent_count: number;
+}
+
+export interface SegmentInsight {
+  segment_id: string;
+  problem: string;
+  cause: string;
+  recommendation: string;
+  summary: string;
+  satisfaction_status: "high" | "medium" | "low";
+  confidence?: number;
+  confidence_label?: string;
+  reason?: string;
+  explainability?: ExplainabilityData;
+  low_confidence_warning?: boolean;
+}
+
 export interface AIClassificationData {
   total_respondents: number;
   satisfaction_percentage: SatisfactionPercentage;
@@ -52,6 +79,9 @@ export interface AIClassificationData {
   };
   text_responses?: string[];
   total_text_responses?: number;
+  segment_insights?: SegmentInsight[];
+  data_insufficient?: boolean;
+  insufficient_message?: string;
 }
 
 export interface AIClassificationResponse {
