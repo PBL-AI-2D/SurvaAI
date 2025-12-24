@@ -17,11 +17,11 @@ interface AISegmentationSectionProps {
 export function AISegmentationSection({
   surveyId,
 }: AISegmentationSectionProps) {
-  // Fetch survey data untuk cek apakah ada responden
+  // Fetch survey data to check if it has respondents
   const { data: survey } = useUserSurvey(surveyId);
   const hasRespondents = survey && survey.jumlah_responden > 0;
 
-  // Fetch analisis kepuasan untuk segmentation data
+  // Fetch satisfaction analysis for segmentation data
   const {
     data: satisfactionData,
     isLoading: isLoadingSatisfaction,
@@ -36,19 +36,19 @@ export function AISegmentationSection({
     satisfactionLevel: "all",
   });
 
-  // Filter segments berdasarkan filter yang dipilih
+  // Filter segments based on selected filters
   const filteredSegments = useMemo(() => {
     if (!satisfactionData?.segments) return [];
     
     return satisfactionData.segments.filter((segment: CustomerSegment) => {
-      // Filter berdasarkan satisfaction level
+      // Filter by satisfaction level
       if (filters.satisfactionLevel !== "all") {
         if (segment.satisfaction_status !== filters.satisfactionLevel) {
           return false;
         }
       }
 
-      // Filter berdasarkan satisfaction percentage range
+      // Filter by satisfaction percentage range
       if (filters.satisfaction !== "all") {
         const satisfaction = segment.satisfaction_percentage;
         switch (filters.satisfaction) {
@@ -70,7 +70,7 @@ export function AISegmentationSection({
         }
       }
 
-      // Filter berdasarkan age range (jika ada avg_age)
+      // Filter by age range (if avg_age is available)
       if (filters.ageRange !== "all" && segment.avg_age) {
         const age = segment.avg_age;
         switch (filters.ageRange) {
@@ -96,7 +96,7 @@ export function AISegmentationSection({
     });
   }, [satisfactionData?.segments, filters]);
 
-  // Filter PCA data berdasarkan segment yang terfilter
+  // Filter PCA data based on filtered segments
   const filteredPcaData = useMemo(() => {
     if (!satisfactionData?.pca_2d || !filteredSegments.length) return [];
     
@@ -107,7 +107,7 @@ export function AISegmentationSection({
     );
   }, [satisfactionData?.pca_2d, filteredSegments]);
 
-  // Generate AI Summary dari data real (menggunakan filtered segments)
+  // Generate AI Summary from real data (using filtered segments)
   const aiSummary = filteredSegments && filteredSegments.length > 0
     ? (() => {
         const highestSegment = filteredSegments.reduce((max, seg) =>
@@ -122,16 +122,18 @@ export function AISegmentationSection({
         
         let summary = `Based on the survey data${isFiltered ? ` (filtered: ${filteredSegments.length} of ${totalSegments} segments)` : ''}, ${filteredSegments.length} distinct respondent segment${filteredSegments.length > 1 ? 's were' : ' was'} identified. `;
         
-        // Info tentang segment tertinggi
-        summary += `Segment ${highestSegment.segment_id} (${highestSegment.respondent_count} respondents) shows the highest satisfaction at ${highestSegment.satisfaction_percentage.toFixed(1)}%`;
+        // Information about the highest segment (use segment_name if available)
+        const highestSegmentName = highestSegment.segment_name || `Segment ${highestSegment.segment_id}`;
+        summary += `${highestSegmentName} (${highestSegment.respondent_count} respondents) shows the highest satisfaction at ${highestSegment.satisfaction_percentage.toFixed(1)}%`;
         if (highestSegment.dominant_preference && highestSegment.dominant_preference !== "N/A") {
           summary += `, with a strong preference for "${highestSegment.dominant_preference}"`;
         }
         summary += `. `;
         
-        // Info tentang segment terendah
+        // Information about the lowest segment
         if (lowestSegment.segment_id !== highestSegment.segment_id && filteredSegments.length > 1) {
-          summary += `Segment ${lowestSegment.segment_id} (${lowestSegment.respondent_count} respondents) has lower satisfaction at ${lowestSegment.satisfaction_percentage.toFixed(1)}%`;
+          const lowestSegmentName = lowestSegment.segment_name || `Segment ${lowestSegment.segment_id}`;
+          summary += `${lowestSegmentName} (${lowestSegment.respondent_count} respondents) has lower satisfaction at ${lowestSegment.satisfaction_percentage.toFixed(1)}%`;
           if (lowestSegment.dominant_preference && lowestSegment.dominant_preference !== "N/A") {
             summary += ` and tends toward "${lowestSegment.dominant_preference}"`;
           }
@@ -206,8 +208,8 @@ export function AISegmentationSection({
       <div className="bg-muted rounded-lg p-4">
         <div className="flex items-start gap-3">
           <Lightbulb className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
-          <div className="text-sm text-muted-foreground">
-            <strong>AI Summary:</strong> {aiSummary}
+          <div className="text-sm" style={{ color: "#1F2937", fontWeight: 400 }}>
+            <strong style={{ color: "#111827", fontWeight: 600 }}>AI Summary:</strong> {aiSummary}
           </div>
         </div>
       </div>

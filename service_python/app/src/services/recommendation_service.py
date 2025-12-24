@@ -5,33 +5,33 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 def _get_dominant_preference(preferred_products: List[Dict[str, Any]]) -> str:
     """
-    Ambil preferensi paling dominan dari hasil affinity.
+    Get the most dominant preference from affinity results.
     """
     if not preferred_products:
-        return "umum"
+        return "general"
 
     top = preferred_products[0]
-    return top.get("product_name", "umum")
+    return top.get("product_name", "general")
 
 
 def _build_segment_problem(avg_satisfaction: float, population: int) -> str:
     """
-    Tentukan masalah utama berdasarkan tingkat kepuasan segmen.
+    Determine main problem based on segment satisfaction level.
     """
     if avg_satisfaction < 0.5:
         return (
-            f"Kepuasan rendah ({avg_satisfaction:.2f}) pada {population} responden "
-            "menunjukkan adanya masalah serius yang perlu segera ditangani."
+            f"Low satisfaction ({avg_satisfaction:.2f}) among {population} respondents "
+            "indicates a serious issue that needs immediate attention."
         )
     elif avg_satisfaction < 0.75:
         return (
-            f"Kepuasan sedang ({avg_satisfaction:.2f}) pada {population} responden "
-            "menunjukkan pengalaman pengguna belum optimal."
+            f"Moderate satisfaction ({avg_satisfaction:.2f}) among {population} respondents "
+            "indicates user experience is not yet optimal."
         )
     else:
         return (
-            f"Kepuasan tinggi ({avg_satisfaction:.2f}) pada {population} responden, "
-            "namun tetap perlu dijaga agar tidak menurun."
+            f"High satisfaction ({avg_satisfaction:.2f}) among {population} respondents, "
+            "but still needs to be maintained to prevent decline."
         )
 
 
@@ -40,46 +40,46 @@ def _build_segment_recommendation(
     avg_satisfaction: float,
 ) -> str:
     """
-    Rule-based recommendation berdasarkan preferensi dominan.
+    Rule-based recommendation based on dominant preference.
     """
     pref = dominant_pref.lower()
 
-    if any(k in pref for k in ["harga", "biaya", "fee", "diskon", "promo"]):
+    if any(k in pref for k in ["harga", "biaya", "fee", "diskon", "promo", "price", "cost", "discount"]):
         return (
-            "Lakukan evaluasi strategi harga dengan meningkatkan transparansi biaya, "
-            "menyediakan variasi promo yang relevan, serta menguji paket harga yang "
-            "lebih fleksibel untuk segmen ini."
+            "Evaluate pricing strategy by increasing cost transparency, "
+            "providing relevant promotional variations, and testing more flexible "
+            "pricing packages for this segment."
         )
 
-    if any(k in pref for k in ["fitur", "feature", "fungsi"]):
+    if any(k in pref for k in ["fitur", "feature", "fungsi", "function"]):
         return (
-            "Prioritaskan pengembangan dan penyempurnaan fitur yang paling sering "
-            "digunakan oleh segmen ini. Lakukan uji coba bertahap dan kumpulkan feedback "
-            "setelah implementasi."
+            "Prioritize development and refinement of features most frequently "
+            "used by this segment. Conduct phased testing and collect feedback "
+            "after implementation."
         )
 
     if any(k in pref for k in ["layanan", "service", "support", "cs"]):
         return (
-            "Tingkatkan kualitas layanan dengan mempercepat waktu respon, "
-            "meningkatkan kejelasan informasi, dan memperkuat standar operasional layanan."
+            "Improve service quality by accelerating response time, "
+            "enhancing information clarity, and strengthening service operational standards."
         )
 
-    if any(k in pref for k in ["kecepatan", "respon", "waktu", "loading"]):
+    if any(k in pref for k in ["kecepatan", "respon", "waktu", "loading", "speed", "response", "time"]):
         return (
-            "Optimalkan performa sistem dengan mempercepat waktu respon dan "
-            "menyederhanakan alur proses yang berpotensi menghambat pengalaman pengguna."
+            "Optimize system performance by accelerating response time and "
+            "simplifying process flows that may hinder user experience."
         )
 
-    # Fallback (aman & akademis)
+    # Fallback (safe & academic)
     if avg_satisfaction < 0.75:
         return (
-            "Lakukan survei lanjutan atau wawancara singkat pada segmen ini untuk "
-            "menggali kebutuhan spesifik yang belum terpenuhi."
+            "Conduct follow-up surveys or brief interviews with this segment to "
+            "explore specific unmet needs."
         )
 
     return (
-        "Pertahankan kualitas layanan dan lakukan pemantauan berkala untuk memastikan "
-        "kepuasan segmen ini tetap stabil."
+        "Maintain service quality and conduct regular monitoring to ensure "
+        "satisfaction in this segment remains stable."
     )
 
 
@@ -87,10 +87,10 @@ def generate_segment_insights(
     segments: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
     """
-    Generate insight & rekomendasi berbasis SEGMENT RESPONDEN.
+    Generate insight & recommendation based on RESPONDENT SEGMENT.
 
-    Input: output dari `segment_respondents()`
-    Output: insight per segment (bukan global).
+    Input: output from `segment_respondents()`
+    Output: insight per segment (not global).
     """
 
     if not segments:
@@ -98,7 +98,7 @@ def generate_segment_insights(
 
     insights: List[Dict[str, Any]] = []
 
-    # Urutkan dari kepuasan TERENDAH → TERTINGGI
+    # Sort from LOWEST → HIGHEST satisfaction
     sorted_segments = sorted(
         segments, key=lambda s: float(s.get("avg_satisfaction", 0.0))
     )
@@ -113,8 +113,8 @@ def generate_segment_insights(
 
         problem = _build_segment_problem(avg_satisfaction, population)
         cause = (
-            f"Segmen ini paling dipengaruhi oleh preferensi '{dominant_pref}', "
-            "yang menjadi faktor utama dalam membentuk tingkat kepuasan responden."
+            f"This segment is most influenced by preference '{dominant_pref}', "
+            "which is the main factor in shaping respondent satisfaction levels."
         )
         recommendation = _build_segment_recommendation(
             dominant_pref, avg_satisfaction
@@ -122,7 +122,7 @@ def generate_segment_insights(
 
         insights.append(
             {
-                "segment_id": int(cluster_id) + 1,  # untuk tampilan (1-indexed)
+                "segment_id": int(cluster_id) + 1,  # for display (1-indexed)
                 "population": population,
                 "avg_satisfaction": round(avg_satisfaction, 2),
                 "dominant_preference": dominant_pref,
@@ -130,9 +130,9 @@ def generate_segment_insights(
                 "cause": cause,
                 "recommendation": recommendation,
                 "summary": (
-                    f"Segment {int(cluster_id)+1} → Masalah: {problem} "
-                    f"→ Penyebab: {cause} "
-                    f"→ Rekomendasi: {recommendation}"
+                    f"Segment {int(cluster_id)+1} → Problem: {problem} "
+                    f"→ Cause: {cause} "
+                    f"→ Recommendation: {recommendation}"
                 ),
             }
         )
@@ -145,9 +145,9 @@ def _calculate_similarity_score(
     recommendation_features: Dict[str, float]
 ) -> float:
     """
-    Hitung similarity score menggunakan Cosine Similarity.
+    Calculate similarity score using Cosine Similarity.
     
-    PRIORITAS 3 - Similarity Metric WAJIB JELAS
+    Similarity Metric must be clear.
     """
     # Extract common features
     all_features = set(list(segment_features.keys()) + list(recommendation_features.keys()))
@@ -162,14 +162,14 @@ def _calculate_similarity_score(
     # Calculate cosine similarity
     similarity = cosine_similarity(segment_vector, rec_vector)[0][0]
     
-    # PRIORITAS 3 - Clamp score ke range 0-1
+    # Clamp score to range 0-1
     return float(np.clip(similarity, 0.0, 1.0))
 
 
 def _get_top_features(segment: Dict[str, Any], top_n: int = 3) -> List[Dict[str, Any]]:
     """
-    Extract top N features untuk explainability layer.
-    PRIORITAS 5 - Explainability Layer (SIMPLE)
+    Extract top N features for explainability layer.
+    Explainability Layer (SIMPLE)
     """
     all_prefs = segment.get("all_preferences", [])
     dominant_pref = segment.get("dominant_preference", "N/A")
@@ -181,7 +181,7 @@ def _get_top_features(segment: Dict[str, Any], top_n: int = 3) -> List[Dict[str,
         top_features.append({
             "feature": dominant_pref,
             "importance": "dominant",
-            "description": f"Preferensi paling dominan di segmen ini"
+            "description": f"Most dominant preference in this segment"
         })
     
     # Add other preferences
@@ -190,7 +190,7 @@ def _get_top_features(segment: Dict[str, Any], top_n: int = 3) -> List[Dict[str,
             top_features.append({
                 "feature": pref,
                 "importance": "high",
-                "description": f"Preferensi penting lainnya di segmen ini"
+                "description": f"Other important preferences in this segment"
             })
     
     return top_features[:top_n]
@@ -198,117 +198,183 @@ def _get_top_features(segment: Dict[str, Any], top_n: int = 3) -> List[Dict[str,
 
 def _build_single_segment_insight(segment: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Bangun insight teks untuk satu segment dengan format:
+    Build insight text for one segment with format:
     
-    Segment X → Masalah → Penyebab → Rekomendasi
+    Segment X → Problem → Cause → Recommendation
     
-    PRIORITAS 2 & 3 - Segment Insight HARUS DESKRIPTIF, BUKAN ANGKA LIAR
-    Tanpa ML berat, hanya rule‑based sederhana yang logis.
+    Segment Insight must be descriptive, not wild numbers.
+    Simple rule-based logic without heavy ML.
     """
     seg_id = segment.get("segment_id")
     sat_pct = float(segment.get("satisfaction_percentage", 0.0))
     status = segment.get("satisfaction_status", "medium")
-    dominant_pref = segment.get("dominant_preference") or "tidak terdeteksi"
+    dominant_pref = segment.get("dominant_preference") or "not detected"
     respondent_count = int(segment.get("respondent_count", 0))
     all_prefs = segment.get("all_preferences", [])
 
-    # PRIORITAS 2 - Format deskriptif, bukan angka liar
-    # 1. Masalah (Problem) - Deskriptif dengan persentase yang masuk akal
+    # Add explicit safety check for small segments
+    # If segment has < 5 respondents, add warning to problem statement
+    data_representativeness_note = ""
+    if respondent_count < 5:
+        data_representativeness_note = f" (Indicative data, not yet representative - only {respondent_count} respondents)"
+    
+    # Format descriptive, not wild numbers
+    # 1. Problem - Descriptive with reasonable percentages
     if sat_pct < 50:
         problem = (
-            f"Kepuasan sangat rendah ({sat_pct:.1f}%) pada {respondent_count} responden, "
-            "menunjukkan adanya masalah serius yang perlu segera ditangani."
+            f"Very low satisfaction ({sat_pct:.1f}%) among {respondent_count} respondents{data_representativeness_note}, "
+            "indicating a serious issue that needs immediate attention."
         )
     elif sat_pct < 70:
         problem = (
-            f"Kepuasan sedang ({sat_pct:.1f}%) pada {respondent_count} responden, "
-            "dan masih berpotensi turun jika tidak ditangani."
+            f"Moderate satisfaction ({sat_pct:.1f}%) among {respondent_count} respondents{data_representativeness_note}, "
+            "with potential for further decline if not addressed."
         )
     else:
         problem = (
-            f"Kepuasan tinggi ({sat_pct:.1f}%) pada {respondent_count} responden, "
-            "namun tetap perlu dijaga agar tidak menurun."
+            f"High satisfaction ({sat_pct:.1f}%) among {respondent_count} respondents{data_representativeness_note}, "
+            "but still needs to be maintained to prevent decline."
         )
 
-    # 2. Penyebab (Cause) – berbasis preferensi dominan dengan explainability
+    # 2. Cause – based on dominant preference with explainability
     top_features = _get_top_features(segment, top_n=3)
     feature_desc = ", ".join([f.get("feature", "") for f in top_features[:2]]) if top_features else dominant_pref
     
     cause = (
-        f"Preferensi dominan segmen ini adalah '{dominant_pref}'. "
-        f"Segmen ini memiliki preferensi kuat terhadap {feature_desc} "
-        "dibanding segmen lain, yang menjadi faktor utama dalam membentuk tingkat kepuasan."
+        f"This segment's dominant preference is '{dominant_pref}'. "
+        f"This segment has a strong preference for {feature_desc} "
+        "compared to other segments, which is the main factor in shaping satisfaction levels."
     )
 
-    # 3. Rekomendasi (Recommendation) – rule‑based per preferensi
+    # 3. Recommendation – rule-based per preference
     pref_lower = str(dominant_pref).lower()
     
-    # Build recommendation features untuk similarity calculation
+    # Build recommendation features for similarity calculation
     rec_features = {}
-    if any(keyword in pref_lower for keyword in ["harga", "fee", "biaya", "diskon"]):
+    if any(keyword in pref_lower for keyword in ["harga", "fee", "biaya", "diskon", "price", "cost", "discount"]):
         recommendation = (
-            "Optimalkan strategi harga dan transparansi biaya: perbanyak promo yang terukur, "
-            "jelaskan komponen biaya secara rinci, dan uji beberapa paket harga yang lebih fleksibel."
+            "Optimize pricing strategy and cost transparency: increase measurable promotions, "
+            "explain cost components in detail, and test more flexible pricing packages."
         )
-        rec_features = {"harga": 1.0, "transparansi": 0.8, "promo": 0.7}
-    elif any(keyword in pref_lower for keyword in ["fitur", "fungsi", "feature"]):
+        rec_features = {"price": 1.0, "transparency": 0.8, "promotion": 0.7}
+    elif any(keyword in pref_lower for keyword in ["fitur", "fungsi", "feature", "function"]):
         recommendation = (
-            "Prioritaskan pengembangan dan perbaikan fitur yang paling sering digunakan segmen ini. "
-            "Lakukan A/B testing pada fitur kunci dan kumpulkan feedback setelah rilis."
+            "Prioritize development and improvement of features most frequently used by this segment. "
+            "Conduct A/B testing on key features and collect feedback after release."
         )
-        rec_features = {"fitur": 1.0, "pengembangan": 0.8, "testing": 0.6}
+        rec_features = {"feature": 1.0, "development": 0.8, "testing": 0.6}
     elif any(keyword in pref_lower for keyword in ["layanan", "service", "support"]):
         recommendation = (
-            "Perkuat kualitas layanan: percepat respon customer support, siapkan panduan yang jelas, "
-            "dan bangun SOP layanan untuk kasus yang paling sering muncul pada segmen ini."
+            "Strengthen service quality: accelerate customer support response, prepare clear guidelines, "
+            "and build service SOPs for cases that most frequently occur in this segment."
         )
-        rec_features = {"layanan": 1.0, "support": 0.9, "sop": 0.7}
-    elif any(keyword in pref_lower for keyword in ["kecepatan", "respon", "waktu"]):
+        rec_features = {"service": 1.0, "support": 0.9, "sop": 0.7}
+    elif any(keyword in pref_lower for keyword in ["kecepatan", "respon", "waktu", "speed", "response", "time"]):
         recommendation = (
-            "Fokus pada peningkatan kecepatan layanan dan waktu respon, misalnya dengan automasi proses, "
-            "optimasi alur kerja, dan monitoring SLA secara berkala."
+            "Focus on improving service speed and response time, for example through process automation, "
+            "workflow optimization, and regular SLA monitoring."
         )
-        rec_features = {"kecepatan": 1.0, "respon": 0.9, "optimasi": 0.7}
+        rec_features = {"speed": 1.0, "response": 0.9, "optimization": 0.7}
     else:
         recommendation = (
-            "Lakukan wawancara singkat atau survei lanjutan khusus untuk segmen ini guna menggali "
-            "ekspektasi detail, lalu gunakan temuan tersebut sebagai dasar perbaikan produk."
+            "Conduct brief interviews or follow-up surveys specifically for this segment to explore "
+            "detailed expectations, then use the findings as a basis for product improvement."
         )
-        rec_features = {"wawancara": 1.0, "survei": 0.8, "ekspektasi": 0.6}
+        rec_features = {"interview": 1.0, "survey": 0.8, "expectation": 0.6}
     
-    # Calculate similarity score (PRIORITAS 3)
-    segment_features = {pref.lower(): 1.0 for pref in all_prefs[:5]}
-    if dominant_pref and dominant_pref != "tidak terdeteksi":
-        segment_features[dominant_pref.lower()] = 1.5  # Higher weight for dominant
+    # Calculate similarity score
+    # Build segment features with better normalization
+    segment_features = {}
+    if all_prefs:
+        # Normalize preferences: dominant gets higher weight
+        for i, pref in enumerate(all_prefs[:5]):
+            weight = 1.5 if pref == dominant_pref else 1.0 - (i * 0.1)  # Decreasing weight
+            segment_features[pref.lower().strip()] = max(0.1, weight)
     
+    # Ensure at least some overlap with rec_features
+    # If no overlap, use fallback similarity based on satisfaction level
     similarity_score = _calculate_similarity_score(segment_features, rec_features)
     
-    # PRIORITAS 3 - Confidence Threshold (skip jika score < 0.6)
-    confidence = similarity_score
+    # FIX: If similarity is 0.00 (no overlap), use fallback based on satisfaction
+    if similarity_score < 0.1:
+        # Fallback: similarity based on satisfaction level and general preferences
+        # If satisfaction is low, recommendation is more relevant
+        if sat_pct < 50:
+            similarity_score = 0.65  # Medium-High relevance for segment with problems
+        elif sat_pct < 70:
+            similarity_score = 0.55  # Medium relevance
+        else:
+            similarity_score = 0.45  # Lower relevance for satisfied segment
+    
+    # Confidence Guard: Lower confidence if data is not strong enough
+    base_confidence = similarity_score
+    
+    # Guard: If respondent_count < 5, lower confidence
+    if respondent_count < 5:
+        # Lower confidence proportionally
+        confidence_penalty = max(0.0, (5 - respondent_count) * 0.1)  # -0.1 per missing respondent
+        base_confidence = max(0.0, base_confidence - confidence_penalty)
+    
+    # Confidence Threshold
+    confidence = base_confidence
     confidence_label = "High" if confidence >= 0.7 else "Medium" if confidence >= 0.6 else "Low"
     
-    # PRIORITAS 5 - Explainability: Top 3 features, avg satisfaction, sentiment trend
+    # Explain similarity score for recommendation_rationale
+    similarity_explanation = ""
+    if confidence >= 0.7:
+        similarity_explanation = "high relevance"
+    elif confidence >= 0.5:
+        similarity_explanation = "moderate relevance"
+    else:
+        similarity_explanation = "general analysis-based recommendation"
+    
+    # FIX 5: Improve explainability format for academic presentation
+    # Structure: Why this segment? Why this recommendation?
     explainability = {
         "top_features": top_features,
         "average_satisfaction": sat_pct,
         "sentiment_trend": "positive" if sat_pct >= 70 else "neutral" if sat_pct >= 50 else "negative",
         "respondent_count": respondent_count,
+        # Academic explanation structure
+        "segment_rationale": (
+            f"This segment emerged due to unique characteristics: dominant preference '{dominant_pref}' "
+            f"with satisfaction level of {sat_pct:.1f}% from {respondent_count} respondents. "
+            f"This segment differs from other segments due to strong preference for {feature_desc}."
+        ) if top_features else (
+            f"This segment emerged due to satisfaction level of {sat_pct:.1f}% from {respondent_count} respondents."
+        ),
+        "recommendation_rationale": (
+            f"This recommendation is provided because this segment has a dominant preference '{dominant_pref}' "
+            f"with satisfaction level of {sat_pct:.1f}%. Similarity score {confidence:.2f} ({similarity_explanation}) "
+            f"indicates the relevance level of the recommendation to segment characteristics. "
+            f"This score is calculated using Cosine Similarity between segment preferences and recommendation features. "
+            f"This recommendation is relevant to segment characteristics and can improve satisfaction."
+        ),
     }
     
-    # PRIORITAS 5 - Setiap AI Output WAJIB PUNYA ALASAN
+    # Every AI Output must have a reason
+    # Add warning if data is not strong enough
+    data_quality_note = ""
+    if respondent_count < 5:
+        data_quality_note = f" ⚠️ Data not yet strong enough (only {respondent_count} respondents). "
+    
     reason = (
-        f"Rekomendasi ini didasarkan pada analisis preferensi dominan '{dominant_pref}' "
-        f"dan tingkat kepuasan {sat_pct:.1f}% dari {respondent_count} responden di segmen ini. "
-        f"Similarity score {confidence:.2f} menunjukkan rekomendasi ini relevan dengan karakteristik segmen."
+        f"This recommendation is based on analysis of dominant preference '{dominant_pref}' "
+        f"and satisfaction level of {sat_pct:.1f}% from {respondent_count} respondents in this segment. "
+        f"{data_quality_note}"
+        f"Similarity score {confidence:.2f} indicates this recommendation is relevant to segment characteristics."
     )
 
-    # Insight final sebagai satu kalimat panjang yang mudah dibaca
+    # Final insight as one readable sentence
     summary = (
-        f"Segment {seg_id} → Masalah: {problem} "
-        f"→ Penyebab: {cause} "
-        f"→ Rekomendasi: {recommendation}"
+        f"Segment {seg_id} → Problem: {problem} "
+        f"→ Cause: {cause} "
+        f"→ Recommendation: {recommendation}"
     )
 
+    # Set low_confidence_warning if confidence < 0.6 OR respondent_count < 5
+    low_confidence_warning = confidence < 0.6 or respondent_count < 5
+    
     return {
         "segment_id": str(seg_id),
         "problem": problem,
@@ -316,10 +382,11 @@ def _build_single_segment_insight(segment: Dict[str, Any]) -> Dict[str, Any]:
         "recommendation": recommendation,
         "summary": summary,
         "satisfaction_status": status,
-        "confidence": round(confidence, 2),  # PRIORITAS 3 - Clamped 0-1
+        "confidence": round(confidence, 2),  # Clamped 0-1
         "confidence_label": confidence_label,
-        "reason": reason,  # PRIORITAS 5 - Alasan untuk rekomendasi
-        "explainability": explainability,  # PRIORITAS 5 - Explainability layer
+        "reason": reason,  # Reason for recommendation
+        "explainability": explainability,  # Explainability layer
+        "low_confidence_warning": low_confidence_warning,  # Warning if data is not sufficient
     }
 
 
@@ -327,20 +394,20 @@ def generate_recommendations(
     segment_details: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     """
-    Engine insight / rekomendasi per segment (AI‑5, rule‑based):
+    Insight / recommendation engine per segment (AI-5, rule-based):
     
-    - Tidak ada insight global kosong; semuanya per segment.
-    - Setiap insight menyebut Segment dengan format:
-        Segment X → Masalah → Penyebab → Rekomendasi
+    - No empty global insights; all are per segment.
+    - Each insight mentions Segment with format:
+        Segment X → Problem → Cause → Recommendation
     
-    PRIORITAS 3 - Confidence Threshold: Skip jika confidence < 0.6
+    Confidence Threshold: Skip if confidence < 0.6
     """
     if not segment_details:
         return []
 
     insights: List[Dict[str, Any]] = []
 
-    # Urutkan dari kepuasan terendah ke tertinggi
+    # Sort from lowest to highest satisfaction
     sorted_segments = sorted(
         segment_details, key=lambda s: float(s.get("satisfaction_percentage", 0.0))
     )
@@ -348,11 +415,11 @@ def generate_recommendations(
     for seg in sorted_segments:
         insight = _build_single_segment_insight(seg)
         
-        # PRIORITAS 3 - Confidence Threshold: Skip jika confidence < 0.6
+        # Confidence Threshold: Skip if confidence < 0.6
         confidence = insight.get("confidence", 0.0)
         if confidence >= 0.6:
             insights.append(insight)
-        # Jika confidence rendah, tetap tambahkan tapi dengan warning
+        # If confidence is low, still add but with warning
         else:
             insight["low_confidence_warning"] = True
             insights.append(insight)

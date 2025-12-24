@@ -42,7 +42,7 @@ export function AIAnalyticsDashboard({ surveyId }: AIAnalyticsDashboardProps) {
   // Check if data is insufficient
   const isDataInsufficient = satisfactionData?.data_insufficient || false;
 
-  // Generate AI Insight Summary
+  // Generate AI Insight Summary dari recommendation_service
   const aiInsightSummary = useMemo(() => {
     if (!satisfactionData) {
       return null;
@@ -58,6 +58,20 @@ export function AIAnalyticsDashboard({ surveyId }: AIAnalyticsDashboardProps) {
         satisfaction_percentage: seg.satisfaction_percentage,
         satisfaction_status: seg.satisfaction_status,
         respondent_count: seg.respondent_count,
+      })),
+      // PRIORITAS: Include segment_insights dari recommendation_service
+      segment_insights: satisfactionData.segment_insights?.map((insight) => ({
+        segment_id: insight.segment_id,
+        problem: insight.problem,
+        cause: insight.cause,
+        recommendation: insight.recommendation,
+        summary: insight.summary,
+        satisfaction_status: insight.satisfaction_status,
+        confidence: insight.confidence,
+        confidence_label: insight.confidence_label,
+        reason: insight.reason,
+        explainability: insight.explainability,
+        low_confidence_warning: insight.low_confidence_warning,
       })),
     };
     return generateAIInsightSummary(satisfactionDataForInsight);
@@ -268,9 +282,9 @@ export function AIAnalyticsDashboard({ surveyId }: AIAnalyticsDashboardProps) {
                 <h2 className="text-xl font-semibold mb-2">
                   AI Insight Summary
                 </h2>
-                <p className="text-sm opacity-90 leading-relaxed">
+                <p className="text-sm leading-relaxed" style={{ color: "#FFFFFF", fontWeight: 400 }}>
                   {aiInsightSummary ||
-                    "Belum ada data survei terbaru untuk dianalisis. Tunggu hingga ada responden yang menyelesaikan survei."}
+                    "No latest survey data is available for analysis. Please wait until respondents complete the survey."}
                 </p>
               </div>
             </div>

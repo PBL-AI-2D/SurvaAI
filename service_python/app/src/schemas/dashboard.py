@@ -49,6 +49,7 @@ class SatisfactionOverview(BaseModel):
 
 class SegmentDetail(BaseModel):
     segment_id: int
+    segment_name: Optional[str] = Field(default=None, description="Logical segment name (e.g., 'Segment Puas - Pecinta Segmentation')")
     avg_age: Optional[int]
     dominant_preference: str
     satisfaction_percentage: float
@@ -92,6 +93,8 @@ class ExplainabilityData(BaseModel):
     average_satisfaction: float
     sentiment_trend: str
     respondent_count: int
+    segment_rationale: Optional[str] = Field(default="", description="Penjelasan mengapa segment ini muncul")
+    recommendation_rationale: Optional[str] = Field(default="", description="Penjelasan mengapa rekomendasi ini diberikan")
 
 
 class SegmentInsight(BaseModel):

@@ -63,7 +63,7 @@ export function FilterDropdowns({ onFilterChange }: FilterDropdownsProps) {
   return (
     <div className="space-y-3">
       <div>
-        <label className="text-sm font-medium text-foreground mb-1 block">
+        <label className="text-sm font-medium mb-1 block" style={{ color: "#111827", fontWeight: 600 }}>
           Gender
         </label>
         <Select value={gender} onValueChange={(value) => handleFilterChange("gender", value)}>
@@ -79,7 +79,7 @@ export function FilterDropdowns({ onFilterChange }: FilterDropdownsProps) {
       </div>
 
       <div>
-        <label className="text-sm font-medium text-foreground mb-1 block">
+        <label className="text-sm font-medium mb-1 block" style={{ color: "#111827", fontWeight: 600 }}>
           Age Range
         </label>
         <Select value={ageRange} onValueChange={(value) => handleFilterChange("ageRange", value)}>
@@ -98,7 +98,7 @@ export function FilterDropdowns({ onFilterChange }: FilterDropdownsProps) {
       </div>
 
       <div>
-        <label className="text-sm font-medium text-foreground mb-1 block">
+        <label className="text-sm font-medium mb-1 block" style={{ color: "#111827", fontWeight: 600 }}>
           Satisfaction
         </label>
         <Select value={satisfaction} onValueChange={(value) => handleFilterChange("satisfaction", value)}>
@@ -116,7 +116,7 @@ export function FilterDropdowns({ onFilterChange }: FilterDropdownsProps) {
         </Select>
       </div>
       <div>
-        <label className="text-sm font-medium text-foreground mb-1 block">
+        <label className="text-sm font-medium mb-1 block" style={{ color: "#111827", fontWeight: 600 }}>
           Satisfaction Level
         </label>
         <Select value={satisfactionLevel} onValueChange={(value) => handleFilterChange("satisfactionLevel", value)}>

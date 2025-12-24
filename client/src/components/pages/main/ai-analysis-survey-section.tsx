@@ -16,17 +16,21 @@ interface AIAnalysisSurveySectionProps {
 export function AIAnalysisSurveySection({
   surveyId,
 }: AIAnalysisSurveySectionProps) {
-  // Fetch survey data untuk cek apakah ada responden
+  // Fetch survey data to check if it has respondents
   const { data: survey } = useUserSurvey(surveyId);
-  const hasRespondents = survey && survey.jumlah_responden > 0;
+  const hasRespondents = survey && (
+    typeof survey.jumlah_responden === "number"
+      ? survey.jumlah_responden > 0
+      : Number(survey.jumlah_responden) > 0
+  );
 
-  // Fetch responses untuk trend chart
+  // Fetch responses for trend chart
   const { responSurveis, isLoading: isLoadingResponses } = useResponSurveis(surveyId, {
     limit: 1000,
     enabled: hasRespondents,
   });
 
-  // Fetch analisis kepuasan
+  // Fetch satisfaction analysis
   const {
     data: satisfactionData,
     isLoading: isLoadingSatisfaction,
@@ -40,21 +44,30 @@ export function AIAnalysisSurveySection({
 
   const isLoading = isLoadingSatisfaction || isLoadingResponses;
 
-  // Generate conclusion from real data
+  // Generate conclusion sesuai tema Satisfaction & Preference Overview
   const conclusion = satisfactionData
     ? (() => {
         const satisfiedPct = satisfactionData.satisfaction_percentage.satisfied;
+        const neutralPct = satisfactionData.satisfaction_percentage.neutral;
+        const unsatisfiedPct = satisfactionData.satisfaction_percentage.unsatisfied;
         const majorPref = satisfactionData.major_preference;
         const avgSatisfaction = (satisfactionData.average_satisfaction * 100).toFixed(1);
+        const totalRespondents = satisfactionData.total_respondents;
         
-        let conclusionText = `Most respondents are ${satisfiedPct >= 50 ? 'satisfied' : 'neutral'} (${satisfiedPct.toFixed(1)}%), `;
-        
-        if (majorPref) {
-          conclusionText += `with a dominant preference for ${majorPref.name} (${majorPref.percentage.toFixed(1)}%). `;
+        // Theme: Satisfaction & Preference Overview - focus on satisfaction distribution and preferences
+        let conclusionText = `Based on ${totalRespondents} completed responses, the satisfaction distribution shows ${satisfiedPct.toFixed(1)}% satisfied`;
+        if (neutralPct > 0) {
+          conclusionText += `, ${neutralPct.toFixed(1)}% neutral`;
         }
+        conclusionText += `, and ${unsatisfiedPct.toFixed(1)}% unsatisfied. `;
         
         conclusionText += `The average satisfaction score is ${avgSatisfaction}%. `;
         
+        if (majorPref) {
+          conclusionText += `The most preferred category or feature is ${majorPref.name} (${majorPref.percentage.toFixed(1)}% of respondents). `;
+        }
+        
+        // Trend analysis
         if (satisfactionTrendData && satisfactionTrendData.length > 1) {
           const trend = satisfactionTrendData[satisfactionTrendData.length - 1].satisfaction - satisfactionTrendData[0].satisfaction;
           if (trend > 0) {
@@ -63,6 +76,15 @@ export function AIAnalysisSurveySection({
             conclusionText += `The satisfaction trend shows a decline (${Math.abs(trend).toFixed(1)}% decrease), which may require attention to product improvements.`;
           } else {
             conclusionText += `The satisfaction trend remains stable, indicating consistent user experience.`;
+          }
+        } else {
+          // Fallback trend based on satisfaction percentage
+          if (satisfiedPct >= 60) {
+            conclusionText += `The current satisfaction level indicates positive user experience and product acceptance.`;
+          } else if (satisfiedPct < 40) {
+            conclusionText += `The current satisfaction level indicates areas that need improvement to enhance user experience.`;
+          } else {
+            conclusionText += `The current satisfaction level shows balanced user experience with room for improvement.`;
           }
         }
         
@@ -125,8 +147,8 @@ export function AIAnalysisSurveySection({
       <div className="bg-muted rounded-lg p-4">
         <div className="flex items-start gap-3">
           <Lightbulb className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
-          <div className="text-sm text-muted-foreground">
-            <strong>Conclusion:</strong> {conclusion}
+          <div className="text-sm" style={{ color: "#1F2937", fontWeight: 400 }}>
+            <strong style={{ color: "#111827", fontWeight: 600 }}>Conclusion:</strong> {conclusion}
           </div>
         </div>
       </div>

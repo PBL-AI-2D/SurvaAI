@@ -16,6 +16,7 @@ export interface SatisfactionPercentage {
 
 export interface CustomerSegment {
   segment_id: number;
+  segment_name?: string;  // Logical segment name (e.g., "Segment Puas - Pecinta Segmentation")
   respondent_count: number;
   satisfaction_percentage: number;
   satisfaction_status: "high" | "medium" | "low";
@@ -47,6 +48,8 @@ export interface ExplainabilityData {
   average_satisfaction: number;
   sentiment_trend: string;
   respondent_count: number;
+  segment_rationale?: string;
+  recommendation_rationale?: string;
 }
 
 export interface SegmentInsight {

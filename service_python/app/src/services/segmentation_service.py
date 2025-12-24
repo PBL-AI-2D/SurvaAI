@@ -31,6 +31,61 @@ def _build_feature_matrix(
     X = base_df.select_dtypes(include=[np.number]).values
     return base_df, X, prod_cols
 
+def _generate_logical_segment_name(
+    avg_sat: float,
+    liked_products: List[Dict[str, Any]],
+    population_count: int,
+    cluster_id: int
+) -> str:
+    """
+    Generate logical segment name berdasarkan karakteristik segment.
+    
+    Format: [Satisfaction Level] - [Dominant Preference]
+    Contoh:
+    - "Segment Puas - Pecinta Segmentation" (satisfaction tinggi, preferensi Segmentation)
+    - "Segment Sedang - Pengguna Ekspor Laporan" (satisfaction sedang)
+    - "Segment Rendah - Pengguna Analisis Preferensi" (satisfaction rendah)
+    """
+    # Tentukan level kepuasan
+    satisfaction_pct = avg_sat * 100
+    if satisfaction_pct >= 70:
+        satisfaction_label = "Puas"
+    elif satisfaction_pct >= 50:
+        satisfaction_label = "Sedang"
+    else:
+        satisfaction_label = "Rendah"
+    
+    # Tentukan preferensi dominan
+    preference_label = ""
+    if liked_products and len(liked_products) > 0:
+        top_product = liked_products[0]
+        product_name = top_product.get('product_name', '')
+        affinity_score = top_product.get('affinity_score', 0.0)
+        
+        # Truncate product name jika terlalu panjang
+        if len(product_name) > 30:
+            product_name = product_name[:27] + "..."
+        
+        # Gunakan label yang lebih natural berdasarkan affinity score
+        if affinity_score >= 0.6:
+            preference_label = f"Pecinta {product_name}"
+        elif affinity_score >= 0.4:
+            preference_label = f"Pengguna {product_name}"
+        else:
+            preference_label = f"Pengguna {product_name}"
+    else:
+        # Jika tidak ada preferensi produk, gunakan informasi lain
+        if population_count > 0:
+            preference_label = f"Kelompok {population_count} Responden"
+        else:
+            preference_label = "Kelompok Umum"
+    
+    # Gabungkan menjadi nama segment yang logical
+    segment_name = f"Segment {satisfaction_label} - {preference_label}"
+    
+    return segment_name
+
+
 def _analyze_cluster_affinity(
     df_cluster: pd.DataFrame, 
     product_cols: List[str]
@@ -178,13 +233,13 @@ def segment_respondents(
         # B. Cari Produk/Fitur Yang Disukai Segmen Ini
         liked_products = _analyze_cluster_affinity(subset, product_cols)
         
-        # C. Auto Naming berdasarkan Produk Terfavorit
-        # Contoh nama: "Puas (0.8) - Pecinta [Produk A]"
-        if liked_products:
-            top_prod = liked_products[0]['product_name']
-            segment_name = f"Segmen {top_prod}"
-        else:
-            segment_name = f"Segmen {c_id}"
+        # C. Generate Logical Segment Name berdasarkan karakteristik segment
+        segment_name = _generate_logical_segment_name(
+            avg_sat=avg_sat,
+            liked_products=liked_products,
+            population_count=int(len(subset)),
+            cluster_id=c_id
+        )
             
         # D. Profil Demografi (Jika ada)
         demo_summary = {}

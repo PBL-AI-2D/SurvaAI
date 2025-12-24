@@ -32,62 +32,167 @@ export interface SatisfactionData {
     satisfaction_status: string;
     respondent_count: number;
   }>;
+  segment_insights?: Array<{
+    segment_id: string;
+    problem: string;
+    cause: string;
+    recommendation: string;
+    summary: string;
+    satisfaction_status: string;
+    confidence?: number;
+    confidence_label?: string;
+    reason?: string;
+    explainability?: {
+      top_features: Array<{
+        feature: string;
+        importance: string;
+        description: string;
+      }>;
+      average_satisfaction: number;
+      sentiment_trend: string;
+      respondent_count: number;
+      segment_rationale?: string;
+      recommendation_rationale?: string;
+    };
+    low_confidence_warning?: boolean;
+  }>;
 }
 
 /**
- * Generate AI Insight Summary based on latest survey data
+ * Generate AI Insight Summary based on recommendation_service insights
+ * Uses segment_insights from recommendation_service.py to provide more specific recommendations
  */
 export function generateAIInsightSummary(satisfactionData: SatisfactionData | null): string {
   if (!satisfactionData || satisfactionData.total_respondents === 0) {
-    return "Belum ada data survei yang tersedia untuk dianalisis. Tunggu hingga ada responden yang menyelesaikan survei.";
+    return "No survey data is available for analysis. Please wait until respondents complete the survey.";
   }
 
-  const { satisfied, neutral, unsatisfied, total_respondents, major_preference, segments } = satisfactionData;
+  const { satisfied, neutral, unsatisfied, total_respondents, major_preference, segments, segment_insights } = satisfactionData;
   
-  // PRIORITAS 2 & 8 - Clamp persentase ke range 0-100%
-  // satisfied, neutral, unsatisfied sudah dalam bentuk persentase (0-100) dari backend
-  // Jangan hitung ulang, langsung clamp dan format
+  // Clamp percentages to range 0-100%
   const satisfiedPct = Math.min(Math.max(Number(satisfied) || 0, 0), 100).toFixed(1);
   const neutralPct = Math.min(Math.max(Number(neutral) || 0, 0), 100).toFixed(1);
   const unsatisfiedPct = Math.min(Math.max(Number(unsatisfied) || 0, 0), 100).toFixed(1);
 
-  // Determine trend (simplified - in real implementation, compare with previous period)
-  // satisfied sudah dalam persentase (0-100), jadi bagi 100 untuk dapat ratio (0-1)
-  const satisfactionRatio = (Number(satisfied) || 0) / 100;
-  let trend = "stabil";
-  if (satisfactionRatio >= 0.6) {
-    trend = "meningkat";
-  } else if (satisfactionRatio < 0.4) {
-    trend = "menurun";
+  // Determine trend from segment insights if available
+  let trend = "stable";
+  if (segment_insights && segment_insights.length > 0) {
+    // Get trend from explainability of first segment (or most relevant)
+    const firstInsight = segment_insights[0];
+    if (firstInsight.explainability?.sentiment_trend) {
+      const sentimentTrend = firstInsight.explainability.sentiment_trend;
+      if (sentimentTrend === "positive") {
+        trend = "increasing";
+      } else if (sentimentTrend === "negative") {
+        trend = "decreasing";
+      }
+    }
+  } else {
+    // Fallback: use satisfaction ratio
+    const satisfactionRatio = (Number(satisfied) || 0) / 100;
+    if (satisfactionRatio >= 0.6) {
+      trend = "increasing";
+    } else if (satisfactionRatio < 0.4) {
+      trend = "decreasing";
+    }
   }
 
-  // Find best segment
+  // Find best segment (use segment_name if available)
   let bestSegment = "";
   if (segments && segments.length > 0) {
     const sortedSegments = [...segments].sort((a, b) => b.satisfaction_percentage - a.satisfaction_percentage);
-    bestSegment = `Segment ${sortedSegments[0].segment_id}` || "";
+    const topSegment = sortedSegments[0];
+    bestSegment = topSegment.segment_name || `Segment ${topSegment.segment_id}` || "";
   }
 
-  // Build insight summary
-  let insight = `Berdasarkan survei terbaru dengan ${total_respondents} responden, kondisi kepuasan pelanggan menunjukkan ${satisfiedPct}% puas, ${neutralPct}% netral, dan ${unsatisfiedPct}% tidak puas. `;
+  // Build base insight summary (synchronized with Conclusion)
+  const avgSatisfaction = segments && segments.length > 0
+    ? (segments.reduce((sum, seg) => sum + seg.satisfaction_percentage, 0) / segments.length).toFixed(1)
+    : "0.0";
+  
+  let insight = `Based on the latest survey with ${total_respondents} respondents, customer satisfaction shows ${satisfiedPct}% satisfied, ${neutralPct}% neutral, and ${unsatisfiedPct}% unsatisfied. `;
 
   if (major_preference) {
-    insight += `Kategori atau fitur yang paling disukai adalah ${major_preference.name} (${major_preference.percentage.toFixed(1)}%). `;
+    insight += `The most preferred category or feature is ${major_preference.name} (${major_preference.percentage.toFixed(1)}%). `;
   }
+
+  insight += `The average satisfaction score is ${avgSatisfaction}%. `;
 
   if (bestSegment) {
-    insight += `Segmen pelanggan terbaik adalah ${bestSegment}. `;
+    insight += `The best customer segment is ${bestSegment}. `;
   }
 
-  insight += `Tren kepuasan saat ini ${trend}. `;
+  // Synchronize trend with Conclusion
+  let trendText = "";
+  if (segment_insights && segment_insights.length > 0) {
+    const firstInsight = segment_insights[0];
+    if (firstInsight.explainability?.sentiment_trend) {
+      const sentimentTrend = firstInsight.explainability.sentiment_trend;
+      if (sentimentTrend === "positive") {
+        trend = "increasing";
+        trendText = `The satisfaction trend shows steady growth, indicating positive product improvements and user experience enhancements.`;
+      } else if (sentimentTrend === "negative") {
+        trend = "decreasing";
+        trendText = `The satisfaction trend shows a decline, which may require attention to product improvements.`;
+      } else {
+        trend = "stable";
+        trendText = `The satisfaction trend remains stable, indicating consistent user experience.`;
+      }
+    }
+  }
+  
+  if (!trendText) {
+    const satisfactionRatio = (Number(satisfied) || 0) / 100;
+    if (satisfactionRatio >= 0.6) {
+      trend = "increasing";
+      trendText = `The satisfaction trend shows steady growth, indicating positive product improvements and user experience enhancements.`;
+    } else if (satisfactionRatio < 0.4) {
+      trend = "decreasing";
+      trendText = `The satisfaction trend shows a decline, which may require attention to product improvements.`;
+    } else {
+      trend = "stable";
+      trendText = `The satisfaction trend remains stable, indicating consistent user experience.`;
+    }
+  }
+  
+  insight += trendText + " ";
 
-  // Add actionable recommendation
-  if (satisfactionRatio < 0.4) {
-    insight += "Disarankan untuk segera melakukan evaluasi dan perbaikan pada aspek yang dikeluhkan pelanggan.";
-  } else if (satisfactionRatio >= 0.6) {
-    insight += "Kondisi ini menunjukkan performa yang baik, pertahankan kualitas layanan dan tingkatkan inovasi.";
+  // Use recommendations from segment_insights (recommendation_service.py)
+  if (segment_insights && segment_insights.length > 0) {
+    // Get recommendation from segment with lowest satisfaction (highest priority)
+    const sortedInsights = [...segment_insights].sort((a, b) => {
+      const aSat = a.explainability?.average_satisfaction || 0;
+      const bSat = b.explainability?.average_satisfaction || 0;
+      return aSat - bSat; // Sort from lowest to highest
+    });
+
+    const priorityInsight = sortedInsights[0];
+    
+    // Use recommendation_rationale if available, or recommendation
+    if (priorityInsight.explainability?.recommendation_rationale) {
+      insight += priorityInsight.explainability.recommendation_rationale;
+    } else if (priorityInsight.recommendation) {
+      // Get main recommendation from segment with biggest problem
+      insight += `Analysis shows: ${priorityInsight.recommendation}`;
+    } else {
+      // Fallback to summary
+      insight += priorityInsight.summary || "";
+    }
+
+    // Add warning if confidence is low
+    if (priorityInsight.low_confidence_warning) {
+      insight += " (Note: This recommendation has a confidence level that needs further verification).";
+    }
   } else {
-    insight += "Perlu perhatian lebih untuk meningkatkan tingkat kepuasan pelanggan melalui peningkatan kualitas layanan.";
+    // Fallback: use general recommendation if no segment insights
+    const satisfactionRatio = (Number(satisfied) || 0) / 100;
+    if (satisfactionRatio < 0.4) {
+      insight += "It is recommended to immediately evaluate and improve aspects that customers complain about.";
+    } else if (satisfactionRatio >= 0.6) {
+      insight += "This condition shows good performance, maintain service quality and increase innovation.";
+    } else {
+      insight += "More attention is needed to improve customer satisfaction through enhanced service quality.";
+    }
   }
 
   return insight;
@@ -107,22 +212,22 @@ export function generateModelPerformanceAlert(
 
   // Check if any metric is below 90%
   if (accuracy < 90) {
-    details.push(`Accuracy: ${accuracy.toFixed(1)}% (di bawah 90%)`);
+    details.push(`Accuracy: ${accuracy.toFixed(1)}% (below 90%)`);
     hasWarning = true;
     if (accuracy < 85) hasCritical = true;
   }
   if (precision < 90) {
-    details.push(`Precision: ${precision.toFixed(1)}% (di bawah 90%)`);
+    details.push(`Precision: ${precision.toFixed(1)}% (below 90%)`);
     hasWarning = true;
     if (precision < 85) hasCritical = true;
   }
   if (recall < 90) {
-    details.push(`Recall: ${recall.toFixed(1)}% (di bawah 90%)`);
+    details.push(`Recall: ${recall.toFixed(1)}% (below 90%)`);
     hasWarning = true;
     if (recall < 85) hasCritical = true;
   }
   if (f1 < 90) {
-    details.push(`F1-Score: ${f1.toFixed(1)}% (di bawah 90%)`);
+    details.push(`F1-Score: ${f1.toFixed(1)}% (below 90%)`);
     hasWarning = true;
     if (f1 < 85) hasCritical = true;
   }
@@ -134,7 +239,7 @@ export function generateModelPerformanceAlert(
     const isDecreasing = accuracyTrend[0] > accuracyTrend[1] && accuracyTrend[1] > accuracyTrend[2];
     
     if (isDecreasing) {
-      details.push(`Tren 3 iterasi terakhir menurun: ${accuracyTrend[2].toFixed(1)}% → ${accuracyTrend[1].toFixed(1)}% → ${accuracyTrend[0].toFixed(1)}%`);
+      details.push(`Last 3 iterations trend decreasing: ${accuracyTrend[2].toFixed(1)}% → ${accuracyTrend[1].toFixed(1)}% → ${accuracyTrend[0].toFixed(1)}%`);
       hasWarning = true;
     }
   }
@@ -145,7 +250,7 @@ export function generateModelPerformanceAlert(
   const maxDiff = Math.max(...metrics.map(m => Math.abs(m - avg)));
   
   if (maxDiff > 5) {
-    details.push(`Selisih metrik antar-model terlalu jauh (selisih maks: ${maxDiff.toFixed(1)}%)`);
+    details.push(`Metric difference between models too large (max difference: ${maxDiff.toFixed(1)}%)`);
     hasWarning = true;
   }
 

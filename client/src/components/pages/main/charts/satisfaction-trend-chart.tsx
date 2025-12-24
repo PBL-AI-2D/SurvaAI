@@ -19,10 +19,8 @@ interface SatisfactionTrendChartProps {
 
 export function SatisfactionTrendChart({ data, isLoading }: SatisfactionTrendChartProps) {
   const chartData = data || [
-    { week: "Week 1", satisfaction: 0 },
-    { week: "Week 2", satisfaction: 0 },
-    { week: "Week 3", satisfaction: 0 },
-    { week: "Week 4", satisfaction: 0 },
+    { week: "Period 1", satisfaction: 0 },
+    { week: "Period 2", satisfaction: 0 },
   ];
 
   if (isLoading) {
@@ -40,19 +38,21 @@ export function SatisfactionTrendChart({ data, isLoading }: SatisfactionTrendCha
           data={chartData}
           margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#D1D5DB" opacity={0.6} />
           <XAxis
             dataKey="week"
-            tick={{ fontSize: 12, fill: "#6B7280" }}
-            axisLine={{ stroke: "#E5E7EB" }}
-            tickLine={{ stroke: "#E5E7EB" }}
+            tick={{ fontSize: 12, fill: "#1F2937", fontWeight: 500 }}
+            axisLine={{ stroke: "#374151", strokeWidth: 1.5 }}
+            tickLine={{ stroke: "#374151" }}
+            label={{ value: "Time Period (Expected Trend Index)", position: "insideBottom", offset: -5, style: { fill: "#1F2937", fontWeight: 600, fontSize: 11 } }}
           />
           <YAxis
-            tick={{ fontSize: 12, fill: "#6B7280" }}
-            axisLine={{ stroke: "#E5E7EB" }}
-            tickLine={{ stroke: "#E5E7EB" }}
+            tick={{ fontSize: 12, fill: "#1F2937", fontWeight: 500 }}
+            axisLine={{ stroke: "#374151", strokeWidth: 1.5 }}
+            tickLine={{ stroke: "#374151" }}
             domain={[0, 100]}
             ticks={[0, 25, 50, 75, 100]}
+            label={{ value: "Satisfaction Index (%)", angle: -90, position: "insideLeft", style: { fill: "#1F2937", fontWeight: 600, fontSize: 11 } }}
           />
           <Tooltip
             formatter={(value: number) => [`${value}%`, "Satisfaction"]}
@@ -77,7 +77,7 @@ export function SatisfactionTrendChart({ data, isLoading }: SatisfactionTrendCha
             strokeWidth={3}
             dot={{ fill: "var(--color-primary-1)", strokeWidth: 2, r: 4 }}
             activeDot={{ r: 6, stroke: "var(--color-primary-1)", strokeWidth: 2 }}
-            name="Satisfaction %"
+            name="Expected Trend Index"
           />
         </LineChart>
       </ResponsiveContainer>

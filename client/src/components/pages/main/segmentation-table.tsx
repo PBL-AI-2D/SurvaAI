@@ -41,19 +41,16 @@ export function SegmentationTable({ segments, isLoading }: SegmentationTableProp
       <Table>
         <TableHeader>
           <TableRow className="bg-muted">
-            <TableHead className="font-semibold text-foreground">
+            <TableHead className="font-semibold" style={{ color: "#111827", fontWeight: 600 }}>
               Segment
             </TableHead>
-            <TableHead className="font-semibold text-foreground">
+            <TableHead className="font-semibold" style={{ color: "#111827", fontWeight: 600 }}>
               Respondents
             </TableHead>
-            <TableHead className="font-semibold text-foreground">
+            <TableHead className="font-semibold" style={{ color: "#111827", fontWeight: 600 }}>
               Key Characteristics
             </TableHead>
-            <TableHead className="font-semibold text-foreground">
-              Satisfaction %
-            </TableHead>
-            <TableHead className="font-semibold text-foreground">
+            <TableHead className="font-semibold" style={{ color: "#111827", fontWeight: 600 }}>
               Satisfaction %
             </TableHead>
           </TableRow>
@@ -61,35 +58,35 @@ export function SegmentationTable({ segments, isLoading }: SegmentationTableProp
         <TableBody>
           {segments.map((segment) => (
             <TableRow key={segment.segment_id} className="hover:bg-muted/50">
-              <TableCell className="font-medium">
-                Segment {segment.segment_id}
+              <TableCell className="font-medium" style={{ color: "#1F2937", fontWeight: 500 }}>
+                {segment.segment_name || `Segment ${segment.segment_id}`}
               </TableCell>
-              <TableCell>{segment.respondent_count}</TableCell>
+              <TableCell style={{ color: "#1F2937", fontWeight: 400 }}>{segment.respondent_count}</TableCell>
               <TableCell>
                 <div className="space-y-1.5">
                   {segment.dominant_preference && segment.dominant_preference !== "N/A" ? (
                     <div className="text-sm">
-                      <span className="font-medium">Preference:</span>{" "}
-                      <span className="text-muted-foreground">{segment.dominant_preference}</span>
+                      <span className="font-medium" style={{ color: "#111827", fontWeight: 600 }}>Preference:</span>{" "}
+                      <span style={{ color: "#374151", fontWeight: 400 }}>{segment.dominant_preference}</span>
                     </div>
                   ) : null}
                   {segment.all_preferences && segment.all_preferences.length > 1 ? (
-                    <div className="text-xs text-muted-foreground">
-                      <span className="font-medium">Also:</span> {segment.all_preferences.slice(1).join(", ")}
+                    <div className="text-xs" style={{ color: "#4B5563", fontWeight: 400 }}>
+                      <span className="font-medium" style={{ color: "#111827", fontWeight: 600 }}>Also:</span> {segment.all_preferences.slice(1).join(", ")}
                     </div>
                   ) : null}
                   {segment.satisfaction_range && segment.satisfaction_range.includes(" - ") ? (
-                    <div className="text-xs text-muted-foreground">
-                      <span className="font-medium">Range:</span> {segment.satisfaction_range}
+                    <div className="text-xs" style={{ color: "#4B5563", fontWeight: 400 }}>
+                      <span className="font-medium" style={{ color: "#111827", fontWeight: 600 }}>Range:</span> {segment.satisfaction_range}
                     </div>
                   ) : null}
                   {segment.avg_age ? (
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs" style={{ color: "#4B5563", fontWeight: 400 }}>
                       Avg. Age: {segment.avg_age} years
                     </div>
                   ) : null}
                   {!segment.dominant_preference || segment.dominant_preference === "N/A" ? (
-                    <span className="text-sm text-muted-foreground">No specific preference identified</span>
+                    <span className="text-sm" style={{ color: "#6B7280", fontWeight: 400 }}>No specific preference identified</span>
                   ) : null}
                 </div>
               </TableCell>

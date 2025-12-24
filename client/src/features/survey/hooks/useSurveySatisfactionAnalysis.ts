@@ -166,6 +166,7 @@ export const useSurveySatisfactionAnalysis = (
         })),
         segments: (pythonData.segmentation?.segment_details || []).map((segment: any) => ({
           segment_id: segment.segment_id,
+          segment_name: segment.segment_name || undefined,  // Logical segment name
           respondent_count: segment.respondent_count,
           satisfaction_percentage: segment.satisfaction_percentage,
           satisfaction_status: segment.satisfaction_status,
@@ -205,6 +206,8 @@ export const useSurveySatisfactionAnalysis = (
                 average_satisfaction: Number(insight.explainability.average_satisfaction || 0),
                 sentiment_trend: String(insight.explainability.sentiment_trend || "stable"),
                 respondent_count: Number(insight.explainability.respondent_count || 0),
+                segment_rationale: insight.explainability.segment_rationale || undefined,
+                recommendation_rationale: insight.explainability.recommendation_rationale || undefined,
               } : undefined,
               low_confidence_warning: Boolean(insight.low_confidence_warning || false),
             }))

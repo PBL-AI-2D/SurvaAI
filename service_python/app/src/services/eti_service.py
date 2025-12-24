@@ -84,6 +84,39 @@ def predict_trend_from_eti(eti_scores: List[float]) -> Tuple[List[str], List[flo
     
     return trend_predictions, trend_percentages
 
+def calculate_trend_from_satisfaction(
+    satisfaction_scores: List[float],
+) -> str:
+    """
+    Hitung trend sederhana berbasis perubahan rata‑rata kepuasan (AI‑3).
+
+    - Tidak menggunakan ARIMA / LSTM / forecasting berat.
+    - Menganggap urutan skor sudah merefleksikan urutan waktu pengisian.
+    - Bandingkan rata‑rata awal vs akhir:
+        * > +0.05  → "positive"
+        * < -0.05  → "negative"
+        * lainnya  → "stable"
+    """
+    if not satisfaction_scores or len(satisfaction_scores) < 2:
+        return "stable"
+
+    scores = np.array(satisfaction_scores, dtype=float)
+
+    # Bagi menjadi dua bagian (awal & akhir) sebagai pendekatan tren sederhana
+    mid = len(scores) // 2
+    first_half = scores[:max(1, mid)]
+    second_half = scores[max(1, mid):]
+
+    avg_first = float(np.mean(first_half))
+    avg_second = float(np.mean(second_half))
+    diff = avg_second - avg_first
+
+    if diff > 0.05:
+        return "positive"
+    if diff < -0.05:
+        return "negative"
+    return "stable"
+
 # --- Fungsi History Dihapus ---
 # calculate_preference_consistency & calculate_extreme_deviation 
 # DIHAPUS karena tidak relevan untuk survei single-batch yang independen.

@@ -1,20 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Lightbulb, BarChart3, TrendingUp, Users, Star } from "lucide-react";
+import { useMemo } from "react";
+import { Lightbulb } from "lucide-react";
 import { SummaryCards } from "./summary-cards";
-import { RespondentPatternChart } from "./charts/respondent-pattern-chart";
-import { SatisfactionTrendChart } from "./charts/satisfaction-trend-chart";
-import { FilterDropdowns, FilterValues } from "./filter-dropdowns";
 import { SatisfactionAnalysisCard } from "@/features/survey/components/user/satisfaction-analysis-card";
 import { useSurveySatisfactionAnalysis } from "@/features/survey/hooks/useSurveySatisfactionAnalysis";
 import { useUserSurvey } from "@/features/survey/hooks/useUserSurveys";
 import { useResponSurveis } from "@/features/survey-response-result/hooks/useUserSurveyResponseresult";
-import { 
-  processResponseTimePattern, 
-  processSatisfactionTrend,
-  generateConclusion 
-} from "@/features/survey/utils/chart-data-processor";
 
 interface DashboardAnalyticSectionProps {
   surveyId: string;
@@ -23,24 +15,17 @@ interface DashboardAnalyticSectionProps {
 export function DashboardAnalyticSection({
   surveyId,
 }: DashboardAnalyticSectionProps) {
-  const [filters, setFilters] = useState<FilterValues>({
-    gender: "all",
-    ageRange: "all",
-    satisfaction: "all",
-    satisfactionLevel: "all",
-  });
-
-  // Fetch survey data untuk cek apakah ada responden
+  // Fetch survey data to check if it has respondents
   const { data: survey } = useUserSurvey(surveyId);
   const hasRespondents = survey && survey.jumlah_responden > 0;
 
-  // Fetch responses untuk chart data
+  // Fetch responses for chart data
   const { responSurveis, isLoading: isLoadingResponses } = useResponSurveis(surveyId, {
     limit: 1000,
     enabled: hasRespondents,
   });
 
-  // Fetch analisis kepuasan
+  // Fetch satisfaction analysis
   const {
     data: satisfactionData,
     isLoading: isLoadingSatisfaction,
@@ -49,141 +34,54 @@ export function DashboardAnalyticSection({
 
   const isLoading = isLoadingSatisfaction || isLoadingResponses;
 
-  const handleFilterChange = (newFilters: FilterValues) => {
-    setFilters(newFilters);
-  };
-
-  // Check if filters are active
-  const isFiltered = useMemo(() => {
-    return filters.gender !== "all" || 
-           filters.ageRange !== "all" || 
-           filters.satisfaction !== "all" || 
-           filters.satisfactionLevel !== "all";
-  }, [filters]);
-
-  // Filter segments berdasarkan filter yang dipilih
-  const filteredSegments = useMemo(() => {
-    if (!satisfactionData?.segments) return [];
-    
-    return satisfactionData.segments.filter((segment) => {
-      // Filter berdasarkan satisfaction level
-      if (filters.satisfactionLevel !== "all") {
-        if (segment.satisfaction_status !== filters.satisfactionLevel) {
-          return false;
-        }
-      }
-
-      // Filter berdasarkan satisfaction percentage range
-      if (filters.satisfaction !== "all") {
-        const satisfaction = segment.satisfaction_percentage;
-        switch (filters.satisfaction) {
-          case "very-satisfied":
-            if (satisfaction < 90) return false;
-            break;
-          case "satisfied":
-            if (satisfaction < 70 || satisfaction >= 90) return false;
-            break;
-          case "neutral":
-            if (satisfaction < 50 || satisfaction >= 70) return false;
-            break;
-          case "dissatisfied":
-            if (satisfaction < 30 || satisfaction >= 50) return false;
-            break;
-          case "very-dissatisfied":
-            if (satisfaction >= 30) return false;
-            break;
-        }
-      }
-
-      // Filter berdasarkan age range (jika ada avg_age)
-      if (filters.ageRange !== "all" && segment.avg_age) {
-        const age = segment.avg_age;
-        switch (filters.ageRange) {
-          case "18-25":
-            if (age < 18 || age > 25) return false;
-            break;
-          case "26-35":
-            if (age < 26 || age > 35) return false;
-            break;
-          case "36-45":
-            if (age < 36 || age > 45) return false;
-            break;
-          case "46-55":
-            if (age < 46 || age > 55) return false;
-            break;
-          case "55+":
-            if (age < 55) return false;
-            break;
-        }
-      }
-
-      return true;
-    });
-  }, [satisfactionData?.segments, filters]);
-
-  // Hitung metrics dari filtered segments
-  const filteredMetrics = useMemo(() => {
-    if (!filteredSegments.length) {
-      return {
-        totalRespondents: 0,
-        avgSatisfaction: 0,
-        satisfiedPct: 0,
-        activeSegments: 0,
-      };
+  // Generate conclusion according to Dashboard Analytic Overview theme
+  const conclusionText = useMemo(() => {
+    if (!satisfactionData) {
+      return "AI model analysis will be available once the survey has completed responses.";
     }
 
-    const totalRespondents = filteredSegments.reduce((sum, seg) => sum + seg.respondent_count, 0);
-    const totalSatisfaction = filteredSegments.reduce(
-      (sum, seg) => sum + (seg.satisfaction_percentage * seg.respondent_count),
-      0
-    );
-    const avgSatisfaction = totalRespondents > 0 ? totalSatisfaction / totalRespondents : 0;
+    const satisfiedPct = satisfactionData.satisfaction_percentage.satisfied;
+    const unsatisfiedPct = satisfactionData.satisfaction_percentage.unsatisfied;
+    const avgSatisfaction = (satisfactionData.average_satisfaction * 100).toFixed(1);
+    const totalRespondents = satisfactionData.total_respondents;
+    const activeSegments = satisfactionData.segments?.length || 0;
+    const bestSegment = satisfactionData.segments && satisfactionData.segments.length > 0
+      ? (() => {
+          const sorted = [...satisfactionData.segments].sort((a, b) => b.satisfaction_percentage - a.satisfaction_percentage);
+          return sorted[0].segment_name || `Segment ${sorted[0].segment_id}`;
+        })()
+      : null;
+    const majorPref = satisfactionData.major_preference;
+
+    // Tema: Dashboard Analytic Overview - fokus pada metrics dan analytics
+    let conclusion = `AI model analysis based on ${totalRespondents} completed responses shows an average satisfaction of ${avgSatisfaction}%. `;
     
-    const satisfiedCount = filteredSegments.reduce(
-      (sum, seg) => sum + (seg.satisfaction_status === "high" ? seg.respondent_count : 0),
-      0
-    );
-    const satisfiedPct = totalRespondents > 0 ? (satisfiedCount / totalRespondents) * 100 : 0;
+    if (bestSegment) {
+      const bestSegmentData = satisfactionData.segments?.find(s => 
+        (s.segment_name || `Segment ${s.segment_id}`) === bestSegment
+      );
+      if (bestSegmentData) {
+        conclusion += `${bestSegment} shows the highest satisfaction at ${bestSegmentData.satisfaction_percentage.toFixed(1)}%. `;
+      }
+    }
 
-    return {
-      totalRespondents,
-      avgSatisfaction,
-      satisfiedPct,
-      activeSegments: filteredSegments.length,
-    };
-  }, [filteredSegments]);
+    // Trend prediction
+    if (satisfiedPct >= 60) {
+      conclusion += `The satisfaction trend is positive with ${satisfiedPct.toFixed(1)}% satisfied responses. `;
+    } else if (satisfiedPct < 40) {
+      conclusion += `The satisfaction trend indicates concerns with ${unsatisfiedPct.toFixed(1)}% unsatisfied responses. `;
+    } else {
+      conclusion += `The satisfaction trend is stable with balanced responses. `;
+    }
 
-  // Create filtered satisfaction data untuk chart dan conclusion
-  const filteredSatisfactionData = useMemo(() => {
-    if (!isFiltered || !satisfactionData) return satisfactionData;
-    
-    return {
-      ...satisfactionData,
-      segments: filteredSegments,
-      total_respondents: filteredMetrics.totalRespondents,
-      average_satisfaction: filteredMetrics.avgSatisfaction / 10,
-      satisfaction_percentage: {
-        satisfied: filteredMetrics.satisfiedPct,
-        neutral: 0,
-        unsatisfied: 100 - filteredMetrics.satisfiedPct,
-      },
-    };
-  }, [satisfactionData, filteredSegments, filteredMetrics, isFiltered]);
+    if (majorPref) {
+      conclusion += `Major preference: ${majorPref.name} (${majorPref.percentage.toFixed(1)}% of respondents). `;
+    }
 
-  // Process chart data
-  const timePatternData = useMemo(() => {
-    if (!responSurveis || responSurveis.length === 0) return undefined;
-    return processResponseTimePattern(responSurveis);
-  }, [responSurveis]);
+    conclusion += `A total of ${activeSegments} active segment${activeSegments > 1 ? 's were' : ' was'} identified through AI clustering analysis.`;
 
-  const satisfactionTrendData = useMemo(() => {
-    if (!responSurveis || responSurveis.length === 0) return undefined;
-    return processSatisfactionTrend(responSurveis, filteredSatisfactionData);
-  }, [responSurveis, filteredSatisfactionData]);
-
-  const conclusionText = useMemo(() => {
-    return generateConclusion(filteredSatisfactionData, responSurveis, timePatternData);
-  }, [filteredSatisfactionData, responSurveis, timePatternData]);
+    return conclusion;
+  }, [satisfactionData]);
 
   return (
     <div className="bg-[var(--glass-bg)] rounded-xl shadow-lg border border-border p-6 space-y-6">
@@ -195,39 +93,15 @@ export function DashboardAnalyticSection({
         <p className="text-muted-foreground">
           Comprehensive metrics and predictive analytics
         </p>
-        {isFiltered && (
-          <p className="text-sm text-muted-foreground italic">
-            Filters applied: {Object.entries(filters)
-              .filter(([_, value]) => value !== "all")
-              .map(([key, value]) => `${key}: ${value}`)
-              .join(", ") || "None"}
-            {filteredSegments.length !== satisfactionData?.segments?.length && (
-              <span className="ml-2">
-                ({filteredSegments.length} of {satisfactionData?.segments?.length || 0} segments shown)
-              </span>
-            )}
-          </p>
-        )}
       </div>
 
-      {/* Filters and Summary Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Filters */}
-        <div className="lg:col-span-1 space-y-4">
-          <h3 className="font-semibold text-foreground">Filters</h3>
-          <div className="bg-muted rounded-lg p-4 border border-border">
-            <FilterDropdowns onFilterChange={handleFilterChange} />
-          </div>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="lg:col-span-3">
-          <SummaryCards 
-            satisfactionData={filteredSatisfactionData}
-            totalResponses={isFiltered ? filteredMetrics.totalRespondents : responSurveis?.length || 0}
-            isLoading={isLoading}
-          />
-        </div>
+      {/* Summary Cards */}
+      <div>
+        <SummaryCards 
+          satisfactionData={satisfactionData}
+          totalResponses={responSurveis?.length || 0}
+          isLoading={isLoading}
+        />
       </div>
 
       {/* Satisfaction Analysis Section */}
@@ -238,48 +112,20 @@ export function DashboardAnalyticSection({
           </h3>
           <SatisfactionAnalysisCard
             surveiId={surveyId}
-            analysisData={filteredSatisfactionData}
+            analysisData={satisfactionData}
             isLoading={isLoadingSatisfaction}
             isError={isErrorSatisfaction}
           />
         </div>
       )}
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Response Pattern Chart */}
-        <div className="space-y-4">
-          <h3 className="font-semibold text-foreground">
-            Responses by time of day
-          </h3>
-          <div className="bg-background rounded-lg p-4 border border-border">
-            <RespondentPatternChart 
-              data={timePatternData}
-              isLoading={isLoading}
-            />
-          </div>
-        </div>
-
-        {/* Satisfaction Trend Chart */}
-        <div className="space-y-4">
-          <h3 className="font-semibold text-foreground">
-            Satisfaction Trend (Weekly)
-          </h3>
-          <div className="bg-background rounded-lg p-4 border border-border">
-            <SatisfactionTrendChart 
-              data={satisfactionTrendData}
-              isLoading={isLoading}
-            />
-          </div>
-        </div>
-      </div>
 
       {/* Conclusion Box */}
       <div className="bg-muted rounded-lg p-4">
         <div className="flex items-start gap-3">
           <Lightbulb className="w-6 h-6 text-primary mt-1 flex-shrink-0" />
-          <div className="text-sm text-muted-foreground">
-            <strong>Conclusion:</strong> {conclusionText}
+          <div className="text-sm" style={{ color: "#1F2937", fontWeight: 400 }}>
+            <strong style={{ color: "#111827", fontWeight: 600 }}>Conclusion:</strong> {conclusionText}
           </div>
         </div>
       </div>
