@@ -208,6 +208,249 @@ def generate_dashboard_data(
     Returns:
         Dictionary dengan struktur sesuai kebutuhan dashboard frontend.
     """
+    # ------------------------------------------------------------------
+    # Helper lokal untuk menghitung Indeks Kepuasan Gabungan (IKG)
+    # ------------------------------------------------------------------
+
+    def _map_sentiment_label_to_score(label: Optional[str]) -> Optional[float]:
+        """
+        Mapping label sentimen NLP ke skor kepuasan 0‑100.
+
+        Sumber skor:
+        - positive  -> 85
+        - neutral   -> 70
+        - negative  -> 50
+
+        Alasan mapping:
+        - Positif diberi skor tinggi namun tidak 100 agar masih bisa
+          "dikoreksi" oleh komponen lain (Likert / pilihan).
+        - Netral di tengah (70) agar tidak terlalu menurunkan skor jika
+          responden tidak banyak menulis opini.
+        - Negatif tidak dibuat terlalu rendah (50) supaya masih bisa
+          tertolong jika Likert menunjukkan kepuasan yang baik.
+        """
+        if not label:
+            return None
+
+        label_lower = str(label).lower()
+        if label_lower == "positive":
+            return 85.0
+        if label_lower == "neutral":
+            return 70.0
+        if label_lower == "negative":
+            return 50.0
+        return None
+
+    def _map_preference_value_to_score(value: str) -> Optional[float]:
+        """
+        Mapping jawaban kategorikal bernuansa kepuasan ke skor 0‑100.
+
+        Aturan semantik utama:
+        - "sangat puas"      -> 90
+        - "puas"             -> 80
+        - "biasa saja/netral"-> 65
+        - "tidak puas/kurang puas" -> 40
+
+        Alasan mapping:
+        - Skala dibuat konsisten dengan sentimen: sangat puas di atas 85,
+          puas sedikit di bawah, netral di area menengah, tidak puas cukup
+          rendah namun tidak 0 agar tetap bisa digabung dengan indikator lain.
+        """
+        if not value:
+            return None
+
+        v = str(value).strip().lower()
+
+        # Sangat puas / sangat senang
+        if "sangat puas" in v or ("sangat" in v and "puas" in v):
+            return 90.0
+
+        # Tidak puas / kurang puas
+        if "tidak puas" in v or "kurang puas" in v or ("tidak" in v and "puas" in v):
+            return 40.0
+
+        # Netral / biasa saja
+        if "biasa saja" in v or "biasa" in v or "netral" in v:
+            return 65.0
+
+        # Puas (tanpa modifier "sangat" / "tidak")
+        if "puas" in v:
+            return 80.0
+
+        return None
+
+    def _compute_preference_scores_from_categorical(
+        categorical: List[Dict[str, Any]]
+    ) -> List[Optional[float]]:
+        """
+        Hitung skor kepuasan berbasis jawaban dropdown / multiple choice / checkbox.
+
+        Untuk tiap responden:
+        - Ambil semua nilai kategorikal (termasuk array / checkbox).
+        - Mapping dengan _map_preference_value_to_score.
+        - Jika ada lebih dari satu jawaban kepuasan, diambil rata‑ratanya.
+
+        Alasan fallback:
+        - Jika tidak ada satu pun nilai yang bisa di‑mapping, kembalikan None
+          agar komponen ini tidak dipakai dalam IKG responden.
+        """
+        result: List[Optional[float]] = []
+
+        for ans in categorical:
+            if not ans or not isinstance(ans, dict):
+                result.append(None)
+                continue
+
+            scores: List[float] = []
+
+            for raw_val in ans.values():
+                if raw_val is None:
+                    continue
+
+                # Handle checkbox (list) dan single value
+                values_to_check: List[Any]
+                if isinstance(raw_val, list):
+                    values_to_check = raw_val
+                elif isinstance(raw_val, (set, tuple)):
+                    values_to_check = list(raw_val)
+                else:
+                    values_to_check = [raw_val]
+
+                for v in values_to_check:
+                    score = _map_preference_value_to_score(str(v))
+                    if score is not None:
+                        scores.append(score)
+
+            if scores:
+                result.append(float(sum(scores) / len(scores)))
+            else:
+                result.append(None)
+
+        return result
+
+    def _compute_combined_satisfaction_index(
+        *,
+        raw_responses: List[Dict[str, Any]],
+        categorical_features: List[Dict[str, Any]],
+        sentiment_labels: List[Any],
+        likert_min_val: float,
+        likert_max_val: float,
+    ) -> Dict[str, Any]:
+        """
+        Hitung Indeks Kepuasan Gabungan (IKG) per responden dan per survei.
+
+        Sumber skor:
+        - Likert / numerik   -> dinormalisasi ke 0‑100
+        - Teks (sentimen)    -> mapping label ke skor tetap (85/70/50)
+        - Pilihan (dropdown/checkbox) -> mapping label kepuasan (90/80/65/40)
+
+        Logika fallback (WAJIB):
+        - Jika suatu respon tidak punya Likert, hanya teks + pilihan yang dipakai.
+        - Jika tidak punya teks, hanya Likert + pilihan yang dipakai.
+        - Jika hanya punya pilihan, indeks tetap dihitung dari pilihan saja.
+        - Jika ketiganya kosong, fallback terakhir memakai skor kepuasan holistik
+          dari sistem (jika tersedia) supaya grafik tidak kosong.
+        """
+        n = len(raw_responses)
+        if n == 0:
+            return {
+                "per_respondent": [],
+                "survey_index": 0.0,
+                "distribution": {"puas": 0, "netral": 0, "tidak_puas": 0},
+                "labels_per_respondent": [],
+            }
+
+        # Skor preferensi per responden (berbasis jawaban kategorikal)
+        preference_scores = _compute_preference_scores_from_categorical(
+            categorical_features
+        )
+
+        # Indeks per responden (0‑100)
+        ikg_per_respondent: List[float] = []
+        labels_per_respondent: List[str] = []
+
+        scale = max(likert_max_val - likert_min_val, 1e-6)
+
+        for idx in range(n):
+            resp = raw_responses[idx] or {}
+
+            # 1) Skor Likert: rata‑rata semua nilai kemudian dinormalisasi ke 0‑100
+            likert_raw = resp.get("likert") or {}
+            likert_score_100: Optional[float] = None
+            if isinstance(likert_raw, dict) and likert_raw:
+                numeric_vals = []
+                for v in likert_raw.values():
+                    try:
+                        numeric_vals.append(float(v))
+                    except (TypeError, ValueError):
+                        continue
+                if numeric_vals:
+                    mean_val = float(sum(numeric_vals) / len(numeric_vals))
+                    norm_0_1 = (mean_val - likert_min_val) / scale
+                    likert_score_100 = float(max(0.0, min(1.0, norm_0_1)) * 100.0)
+
+            # 2) Skor Sentimen dari label model NLP (positive/neutral/negative)
+            sentiment_label = (
+                sentiment_labels[idx] if idx < len(sentiment_labels) else None
+            )
+            sentiment_score_100 = _map_sentiment_label_to_score(sentiment_label)
+
+            # 3) Skor Preferensi dari jawaban kategorikal (jika ada)
+            pref_score_100 = (
+                preference_scores[idx]
+                if idx < len(preference_scores)
+                else None
+            )
+
+            components: List[float] = []
+            if likert_score_100 is not None:
+                components.append(likert_score_100)
+            if sentiment_score_100 is not None:
+                components.append(sentiment_score_100)
+            if pref_score_100 is not None:
+                components.append(pref_score_100)
+
+            if components:
+                ikg_value = float(sum(components) / len(components))
+            else:
+                # Fallback terakhir: jika benar‑benar tidak ada komponen eksplisit,
+                # kembalikan 0.0 dan biarkan distribusi dianggap "Tidak Puas".
+                ikg_value = 0.0
+
+            # Clamp ke 0‑100
+            ikg_value = float(max(0.0, min(100.0, ikg_value)))
+            ikg_per_respondent.append(ikg_value)
+
+            # Label kategori per responden, mengikuti aturan global:
+            # ≥ 80  -> Puas, 60–79 -> Netral, < 60 -> Tidak Puas
+            if ikg_value >= 80.0:
+                label = "Puas"
+            elif ikg_value >= 60.0:
+                label = "Netral"
+            else:
+                label = "Tidak Puas"
+            labels_per_respondent.append(label)
+
+        # Indeks survei = rata‑rata seluruh IKG responden
+        survey_index = float(sum(ikg_per_respondent) / len(ikg_per_respondent))
+
+        # Distribusi kategori berdasarkan IKG responden
+        dist = {"puas": 0, "netral": 0, "tidak_puas": 0}
+        for label in labels_per_respondent:
+            if label == "Puas":
+                dist["puas"] += 1
+            elif label == "Netral":
+                dist["netral"] += 1
+            else:
+                dist["tidak_puas"] += 1
+
+        return {
+            "per_respondent": ikg_per_respondent,
+            "survey_index": survey_index,
+            "distribution": dist,
+            "labels_per_respondent": labels_per_respondent,
+        }
+
     # 1. Validasi input sederhana
     _validate_inputs(responses)
     
@@ -236,6 +479,26 @@ def generate_dashboard_data(
         ai1_result.get("sentiment_distribution", {}),
         satisfaction_scores,
     )
+
+    # ------------------------------------------------------------------
+    # 4b. HITUNG INDEKS KEPUASAN GABUNGAN (IKG)
+    # ------------------------------------------------------------------
+    combined_index_result = _compute_combined_satisfaction_index(
+        raw_responses=responses,
+        categorical_features=categorical_features,
+        sentiment_labels=ai1_result.get("sentiment_labels", []),
+        likert_min_val=likert_min,
+        likert_max_val=likert_max,
+    )
+
+    ikg_per_respondent: List[float] = combined_index_result["per_respondent"]
+    ikg_survey: float = combined_index_result["survey_index"]
+    ikg_distribution = combined_index_result["distribution"]
+
+    # Konversi IKG 0‑100 ke 0‑1 untuk reuse di chart & metrik rata‑rata
+    ikg_scores_0_1: List[float] = [
+        (score / 100.0) if score is not None else 0.0 for score in ikg_per_respondent
+    ]
     
     # 5. Konversi categorical_features ke product_features (One-Hot Encoding)
     product_features = convert_categorical_to_product_features(categorical_features)
@@ -275,7 +538,21 @@ def generate_dashboard_data(
     )
     
     # 8. Calculate satisfaction percentage
-    satisfaction_pct = calculate_satisfaction_percentage(sentiment_dist, total_respondents)
+    #    Menggunakan distribusi IKG (bukan hanya sentimen) agar grafik
+    #    "Distribution of respondent satisfaction levels" selalu berbasis
+    #    indeks gabungan semua tipe pertanyaan.
+    if total_respondents > 0:
+        satisfied_pct = (ikg_distribution["puas"] / total_respondents) * 100.0
+        neutral_pct = (ikg_distribution["netral"] / total_respondents) * 100.0
+        unsatisfied_pct = (ikg_distribution["tidak_puas"] / total_respondents) * 100.0
+    else:
+        satisfied_pct = neutral_pct = unsatisfied_pct = 0.0
+
+    satisfaction_pct = {
+        "satisfied": satisfied_pct,
+        "neutral": neutral_pct,
+        "unsatisfied": unsatisfied_pct,
+    }
     
     # 9. Extract preferences
     all_preferences = extract_preference_from_categorical(categorical_features)
@@ -290,8 +567,10 @@ def generate_dashboard_data(
     if segment_details:
         highest_segment = max(segment_details, key=lambda x: x["satisfaction_percentage"])
     
-    # 11. Calculate average satisfaction (0-10 scale)
-    avg_satisfaction_10 = round(np.mean(satisfaction_scores) * 10, 1) if satisfaction_scores else 0.0
+    # 11. Calculate average satisfaction (0-10 scale) berbasis IKG
+    avg_satisfaction_10 = (
+        round(float(np.mean(ikg_scores_0_1)) * 10, 1) if ikg_scores_0_1 else 0.0
+    )
     
     # 12. Calculate trend
     satisfaction_trend = calculate_trend_from_satisfaction(satisfaction_scores)
@@ -355,7 +634,9 @@ def generate_dashboard_data(
         
         # Raw data untuk chart
         "chart_data": {
-            "satisfaction_scores": satisfaction_scores,
+            # Gunakan IKG (0‑1) sebagai dasar grafik kepuasan responden,
+            # sehingga mencerminkan kombinasi Likert + teks + pilihan.
+            "satisfaction_scores": ikg_scores_0_1,
             "sentiment_scores": sentiment_scores,
             "sentiment_labels": ai1_result.get("sentiment_labels", []),
             "likert_normalized": ai1_result.get("details", {}).get("likert_normalized", []),
@@ -375,5 +656,19 @@ def generate_dashboard_data(
         "data_insufficient": False,
         "insufficient_message": None,
     }
+
+    # Tambahan field untuk Indeks Kepuasan Gabungan (IKG) agar tetap
+    # backward compatible (field baru, tidak mengubah struktur lama).
+    dashboard_data["combined_satisfaction_index"] = ikg_survey
+
+    if ikg_survey >= 80.0:
+        combined_label = "Puas"
+    elif ikg_survey >= 60.0:
+        combined_label = "Netral"
+    else:
+        combined_label = "Tidak Puas"
+
+    dashboard_data["combined_satisfaction_label"] = combined_label
+    dashboard_data["distribution_combined_satisfaction"] = ikg_distribution
     
     return dashboard_data
