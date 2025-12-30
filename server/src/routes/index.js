@@ -25,6 +25,11 @@ import publicSurveiRoutes from './public/survei.routes.js';
 import publicHadiahRoutes from './public/hadiah.routes.js';
 import publicEmailRoutes from './public/email.routes.js';
 
+import datasetAiRoutes from './datasetAi.routes.js';
+import analisisAiRoutes from './analisisAi.routes.js';
+import segmentasiRespondenRoutes from './segmentasiResponden.routes.js';
+import adminControlRoutes from './adminControl.routes.js';
+
 const router = Router();
 
 router.use('/', loginRoutes);
@@ -52,5 +57,11 @@ router.use('/users/penukaran-hadiah', userPenukaranHadiahRoutes)
 router.use('/public/survei', publicSurveiRoutes)
 router.use('/public/hadiah', publicHadiahRoutes)
 router.use('/public/email', publicEmailRoutes)
+
+// AI Management Routes
+router.use('/ai/datasets', datasetAiRoutes);
+router.use('/ai/analyses', analisisAiRoutes);
+router.use('/ai/segments', segmentasiRespondenRoutes);
+router.use('/admin/control', adminControlRoutes);
 
 export default router;

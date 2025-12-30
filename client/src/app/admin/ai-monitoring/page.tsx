@@ -42,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AIManagementSection } from "@/components/pages/admin/ai-management-section";
 
 export default function AdminAIMonitoringPage() {
   const [open, setOpen] = useState(false);
@@ -265,6 +266,18 @@ export default function AdminAIMonitoringPage() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* AI Management & Control Section */}
+      <Card className="bg-muted/30 border-muted-foreground/20">
+        <CardHeader>
+          <CardTitle className="text-xl">AI Management & Control</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AIManagementSection />
+        </CardContent>
+      </Card>
+
+      <Separator />
+
       {/* Model Performance Alert */}
       <div className="grid grid-cols-1 lg:grid-cols-1 gap-4">
         {/* Model Performance Alert */}

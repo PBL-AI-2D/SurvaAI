@@ -79,6 +79,9 @@ export default (sequelize, DataTypes) => {
     Survei.hasMany(models.PertanyaanSurvei, { foreignKey: 'id_survei'});
     Survei.hasOne(models.PembayaranSurvei, { foreignKey: 'id_survei'});
     Survei.hasMany(models.ResponSurvei, { foreignKey: 'id_survei'});
+    Survei.hasMany(models.DatasetAi, { foreignKey: 'id_survei'});
+    Survei.hasMany(models.AnalisisAi, { foreignKey: 'id_survei'});
+    Survei.hasMany(models.SegmentasiResponden, { foreignKey: 'id_survei'});
   };
 
   return Survei;
