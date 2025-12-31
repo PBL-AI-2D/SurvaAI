@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr, spearmanr
+import re
 
 # --- BAGIAN IMPORT (Sama seperti sebelumnya, menjaga kompatibilitas path) ---
 _original_cwd = os.getcwd()
@@ -32,8 +33,55 @@ finally:
 
 # --- END IMPORT ---
 
+def _extract_numeric_from_likert(value: Any) -> Optional[float]:
+    """
+    Extract numeric value dari Likert response.
+    Handle berbagai format: "Label 5", "Option 1", "5", 5, dll.
+    
+    Args:
+        value: Nilai Likert yang bisa berupa string, int, atau float
+    
+    Returns:
+        Float value atau None jika tidak bisa diextract
+    """
+    if value is None:
+        return None
+    
+    # Jika sudah numerik
+    if isinstance(value, (int, float)):
+        return float(value)
+    
+    value_str = str(value).strip()
+    
+    # Coba langsung convert ke float
+    try:
+        return float(value_str)
+    except (ValueError, TypeError):
+        pass
+    
+    # Extract angka dari string (e.g., "Label 5" → 5, "Option 3" → 3)
+    numbers = re.findall(r'\d+', value_str)
+    if numbers:
+        return float(numbers[0])
+    
+    # Mapping text-based Likert untuk fallback
+    value_lower = value_str.lower()
+    if any(kw in value_lower for kw in ["sangat", "very", "excellent", "terbaik", "paling"]):
+        return 5.0
+    if any(kw in value_lower for kw in ["puas", "baik", "good", "satisfied", "setuju"]):
+        return 4.0
+    if any(kw in value_lower for kw in ["biasa", "netral", "neutral", "average", "cukup"]):
+        return 3.0
+    if any(kw in value_lower for kw in ["kurang", "tidak", "poor", "bad", "tidak setuju"]):
+        return 2.0
+    if any(kw in value_lower for kw in ["sangat tidak", "very poor", "worst", "sangat kurang"]):
+        return 1.0
+    
+    return None
+
+
 def _normalize_likert(
-    likert_list: List[Dict[str, float]],
+    likert_list: List[Dict[str, Any]],
     likert_min: float,
     likert_max: float,
 ) -> List[Dict[str, float]]:
@@ -44,10 +92,12 @@ def _normalize_likert(
 
     normalized_all: List[Dict[str, float]] = []
     for ans in likert_list:
-        normalized = {
-            k: (float(v) - likert_min) / scale
-            for k, v in ans.items()
-        }
+        normalized = {}
+        for k, v in ans.items():
+            # Extract numeric value dari berbagai format
+            numeric_val = _extract_numeric_from_likert(v)
+            if numeric_val is not None:
+                normalized[k] = (numeric_val - likert_min) / scale
         normalized_all.append(normalized)
     return normalized_all
 
@@ -86,15 +136,22 @@ def _score_categorical_answers(
 
 def _run_sentiment(
     texts: List[Optional[str]],
-) -> Tuple[List[Optional[str]], List[Optional[float]]]:
-    """Mendapatkan label sentimen dan skor ternormalisasi (0-1) dari IndoBERT"""
+) -> Tuple[List[Optional[str]], List[Optional[float]], List[Optional[float]]]:
+    """
+    Mendapatkan label sentimen, skor ternormalisasi (0-1), dan confidence score dari IndoBERT.
+    
+    Returns:
+        Tuple of (labels, scores, confidence_scores)
+    """
     labels: List[Optional[str]] = []
     scores: List[Optional[float]] = []
+    confidence_scores: List[Optional[float]] = []
 
     for text in texts:
         if not text:
             labels.append(None)
             scores.append(None) # Nanti dianggap netral atau di-skip
+            confidence_scores.append(None)
             continue
 
         try:
@@ -115,11 +172,53 @@ def _run_sentiment(
             
             labels.append(label)
             scores.append(score)
+            confidence_scores.append(confidence)  # Simpan confidence score untuk explainability
         except:
             labels.append("neutral")
             scores.append(0.5)
+            confidence_scores.append(0.5)  # Default confidence jika error
 
-    return labels, scores
+    return labels, scores, confidence_scores
+
+
+def normalize_sentiment_distribution(
+    sentiment_dist_raw: Any,
+    satisfaction_scores: List[float],
+) -> Dict[str, int]:
+    """
+    Normalize sentiment distribution dari hasil AI service.
+    Jika sentiment distribution kosong, gunakan satisfaction scores sebagai fallback.
+    
+    Args:
+        sentiment_dist_raw: Raw sentiment distribution dari AI service
+        satisfaction_scores: List satisfaction scores (0-1)
+    
+    Returns:
+        Dictionary dengan keys "positive", "negative", "neutral"
+    """
+    if not isinstance(sentiment_dist_raw, dict):
+        sentiment_dist = {"positive": 0, "negative": 0, "neutral": 0}
+    else:
+        sentiment_dist = {
+            "positive": int(sentiment_dist_raw.get("positive", 0)),
+            "negative": int(sentiment_dist_raw.get("negative", 0)),
+            "neutral": int(sentiment_dist_raw.get("neutral", 0)),
+        }
+    
+    # Jika sentiment_distribution kosong (semua 0), gunakan satisfaction_scores sebagai fallback
+    total_sentiment = sentiment_dist["positive"] + sentiment_dist["negative"] + sentiment_dist["neutral"]
+    if total_sentiment == 0 and satisfaction_scores:
+        # Hitung distribusi sentimen berdasarkan satisfaction scores
+        # Score > 0.7 = positive, < 0.3 = negative, else = neutral
+        for score in satisfaction_scores:
+            if score > 0.7:
+                sentiment_dist["positive"] += 1
+            elif score < 0.3:
+                sentiment_dist["negative"] += 1
+            else:
+                sentiment_dist["neutral"] += 1
+    
+    return sentiment_dist
 
 def _compute_holistic_satisfaction(
     likert_normalized: List[Dict[str, float]],
@@ -225,8 +324,8 @@ def analyze_satisfaction(
     # 2. Process Likert (0-1)
     likert_norm = _normalize_likert(likert_list, likert_min, likert_max)
     
-    # 3. Process Sentiment (0-1)
-    sentiment_labels, sentiment_scores = _run_sentiment(texts)
+    # 3. Process Sentiment (0-1) - sekarang juga mengembalikan confidence scores
+    sentiment_labels, sentiment_scores, sentiment_confidence_scores = _run_sentiment(texts)
     
     # 4. Process Categorical Scoring (0-1)
     # Jika tidak ada mapping, skor kategorikal dianggap NaN (tidak mempengaruhi nilai akhir)
@@ -266,6 +365,7 @@ def analyze_satisfaction(
         "average_satisfaction": float(np.mean(final_scores)) if final_scores else 0.0,
         "sentiment_labels": sentiment_labels,
         "sentiment_scores": sentiment_scores,
+        "sentiment_confidence_scores": sentiment_confidence_scores,  # Tambahan: confidence scores untuk explainability
         "sentiment_distribution": dist,
         "correlations": correlations,
         "details": {

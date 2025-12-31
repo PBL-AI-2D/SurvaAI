@@ -66,6 +66,53 @@ export interface SegmentInsight {
   low_confidence_warning?: boolean;
 }
 
+export interface IKGExplainability {
+  respondent_index: number;
+  ikg_value: number;
+  label: "Puas" | "Netral" | "Tidak Puas";
+  components_used: string[];
+  component_scores: {
+    likert?: number;
+    sentiment?: number;
+    preference?: number;
+  };
+  weights_applied: {
+    likert: number;
+    sentiment: number;
+    preference: number;
+  };
+  base_weights: {
+    likert: number;
+    sentiment: number;
+    preference: number;
+  };
+  adaptive_adjustment: string;
+  explanation: string;
+  reason: string;
+  sentiment_confidence?: number;
+  detected_language: string;
+  details: {
+    likert_details: string[];
+    preference_details: string[];
+  };
+}
+
+export interface WeightMetadata {
+  method: "dynamic" | "default";
+  likert_availability: string;
+  sentiment_availability: string;
+  preference_availability: string;
+  avg_confidence: number;
+  low_confidence_ratio: string;
+}
+
+export interface ValidationMetrics {
+  mean_absolute_deviation: number;
+  max_deviation?: number;
+  min_deviation?: number;
+  interpretation: string;
+}
+
 export interface AIClassificationData {
   total_respondents: number;
   satisfaction_percentage: SatisfactionPercentage;
@@ -85,6 +132,19 @@ export interface AIClassificationData {
   segment_insights?: SegmentInsight[];
   data_insufficient?: boolean;
   insufficient_message?: string;
+  // IKG Explainability & System Validity
+  ikg_explainability?: IKGExplainability[];
+  sentiment_confidence_scores?: number[];
+  average_sentiment_confidence?: number;
+  weight_metadata?: WeightMetadata;
+  validation_metrics?: ValidationMetrics;
+  combined_satisfaction_index?: number;
+  combined_satisfaction_label?: "Puas" | "Netral" | "Tidak Puas";
+  distribution_combined_satisfaction?: {
+    puas: number;
+    netral: number;
+    tidak_puas: number;
+  };
 }
 
 export interface AIClassificationResponse {

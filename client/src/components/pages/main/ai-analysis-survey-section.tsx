@@ -44,31 +44,70 @@ export function AIAnalysisSurveySection({
 
   const isLoading = isLoadingSatisfaction || isLoadingResponses;
 
-  // Generate conclusion sesuai tema Satisfaction & Preference Overview
+  // Generate conclusion sesuai tema Satisfaction & Preference Overview menggunakan IKG dan explainability
   const conclusion = satisfactionData
     ? (() => {
-        const satisfiedPct = satisfactionData.satisfaction_percentage.satisfied;
-        const neutralPct = satisfactionData.satisfaction_percentage.neutral;
-        const unsatisfiedPct = satisfactionData.satisfaction_percentage.unsatisfied;
-        const majorPref = satisfactionData.major_preference;
-        const avgSatisfaction = (satisfactionData.average_satisfaction * 100).toFixed(1);
         const totalRespondents = satisfactionData.total_respondents;
+        const ikgIndex = satisfactionData.combined_satisfaction_index;
+        const ikgLabel = satisfactionData.combined_satisfaction_label;
+        const ikgDist = satisfactionData.distribution_combined_satisfaction;
+        const majorPref = satisfactionData.major_preference;
+        const weightMetadata = satisfactionData.weight_metadata;
         
-        // Theme: Satisfaction & Preference Overview - focus on satisfaction distribution and preferences
-        let conclusionText = `Based on ${totalRespondents} completed responses, the satisfaction distribution shows ${satisfiedPct.toFixed(1)}% satisfied`;
-        if (neutralPct > 0) {
-          conclusionText += `, ${neutralPct.toFixed(1)}% neutral`;
+        // Gunakan IKG distribution jika tersedia, fallback ke satisfaction_percentage lama
+        let satisfiedPct: number;
+        let neutralPct: number;
+        let unsatisfiedPct: number;
+        
+        if (ikgDist && totalRespondents > 0) {
+          satisfiedPct = (ikgDist.puas / totalRespondents) * 100;
+          neutralPct = (ikgDist.netral / totalRespondents) * 100;
+          unsatisfiedPct = (ikgDist.tidak_puas / totalRespondents) * 100;
+        } else {
+          satisfiedPct = satisfactionData.satisfaction_percentage.satisfied;
+          neutralPct = satisfactionData.satisfaction_percentage.neutral;
+          unsatisfiedPct = satisfactionData.satisfaction_percentage.unsatisfied;
         }
-        conclusionText += `, and ${unsatisfiedPct.toFixed(1)}% unsatisfied. `;
         
-        conclusionText += `The average satisfaction score is ${avgSatisfaction}%. `;
+        // Theme: Satisfaction & Preference Overview - focus on IKG dan explainability
+        let conclusionText = "";
+        
+        if (ikgIndex !== undefined) {
+          conclusionText = `Based on ${totalRespondents} completed responses, the Combined Satisfaction Index (IKG) is ${ikgIndex.toFixed(1)}% (${ikgLabel || 'Netral'}). `;
+          conclusionText += `The satisfaction distribution based on IKG shows ${satisfiedPct.toFixed(1)}% satisfied`;
+          if (neutralPct > 0) {
+            conclusionText += `, ${neutralPct.toFixed(1)}% neutral`;
+          }
+          conclusionText += `, and ${unsatisfiedPct.toFixed(1)}% unsatisfied. `;
+        } else {
+          const avgSatisfaction = (satisfactionData.average_satisfaction * 100).toFixed(1);
+          conclusionText = `Based on ${totalRespondents} completed responses, the satisfaction distribution shows ${satisfiedPct.toFixed(1)}% satisfied`;
+          if (neutralPct > 0) {
+            conclusionText += `, ${neutralPct.toFixed(1)}% neutral`;
+          }
+          conclusionText += `, and ${unsatisfiedPct.toFixed(1)}% unsatisfied. `;
+          conclusionText += `The average satisfaction score is ${avgSatisfaction}%. `;
+        }
+        
+        // Tambahkan explanation tentang dynamic weighting jika ada
+        if (weightMetadata && weightMetadata.method === "dynamic") {
+          conclusionText += `The analysis uses dynamic weighting that adapts to data availability: ${weightMetadata.likert_availability} Likert responses, ${weightMetadata.sentiment_availability} sentiment data, and ${weightMetadata.preference_availability} preference data were considered. `;
+        }
         
         if (majorPref) {
           conclusionText += `The most preferred category or feature is ${majorPref.name} (${majorPref.percentage.toFixed(1)}% of respondents). `;
         }
         
-        // Trend analysis
-        if (satisfactionTrendData && satisfactionTrendData.length > 1) {
+        // Trend analysis menggunakan IKG jika tersedia
+        if (ikgIndex !== undefined) {
+          if (satisfiedPct >= 60) {
+            conclusionText += `The satisfaction trend shows steady growth (${satisfiedPct.toFixed(1)}% satisfied based on IKG), indicating positive product improvements and user experience enhancements.`;
+          } else if (unsatisfiedPct >= 40) {
+            conclusionText += `The satisfaction trend shows a decline (${unsatisfiedPct.toFixed(1)}% unsatisfied based on IKG), which may require attention to product improvements.`;
+          } else {
+            conclusionText += `The satisfaction trend remains stable based on Combined Satisfaction Index, indicating consistent user experience.`;
+          }
+        } else if (satisfactionTrendData && satisfactionTrendData.length > 1) {
           const trend = satisfactionTrendData[satisfactionTrendData.length - 1].satisfaction - satisfactionTrendData[0].satisfaction;
           if (trend > 0) {
             conclusionText += `The satisfaction trend shows steady growth (${trend.toFixed(1)}% increase), indicating positive product improvements and user experience enhancements.`;

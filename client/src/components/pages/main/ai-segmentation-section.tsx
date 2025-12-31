@@ -107,7 +107,7 @@ export function AISegmentationSection({
     );
   }, [satisfactionData?.pca_2d, filteredSegments]);
 
-  // Generate AI Summary from real data (using filtered segments)
+  // Generate AI Summary dari segment insights dengan reason/explainability
   const aiSummary = filteredSegments && filteredSegments.length > 0
     ? (() => {
         const highestSegment = filteredSegments.reduce((max, seg) =>
@@ -119,10 +119,11 @@ export function AISegmentationSection({
         
         const totalSegments = satisfactionData?.segments?.length || 0;
         const isFiltered = filteredSegments.length !== totalSegments;
+        const segmentInsights = satisfactionData?.segment_insights || [];
         
         let summary = `Based on the survey data${isFiltered ? ` (filtered: ${filteredSegments.length} of ${totalSegments} segments)` : ''}, ${filteredSegments.length} distinct respondent segment${filteredSegments.length > 1 ? 's were' : ' was'} identified. `;
         
-        // Information about the highest segment (use segment_name if available)
+        // Information about the highest segment dengan reason dari segment insights
         const highestSegmentName = highestSegment.segment_name || `Segment ${highestSegment.segment_id}`;
         summary += `${highestSegmentName} (${highestSegment.respondent_count} respondents) shows the highest satisfaction at ${highestSegment.satisfaction_percentage.toFixed(1)}%`;
         if (highestSegment.dominant_preference && highestSegment.dominant_preference !== "N/A") {
@@ -130,14 +131,42 @@ export function AISegmentationSection({
         }
         summary += `. `;
         
-        // Information about the lowest segment
+        // Cari reason dari segment insights untuk highest segment
+        const highestInsight = segmentInsights.find((insight: any) => 
+          String(insight.segment_id) === String(highestSegment.segment_id)
+        );
+        if (highestInsight?.reason) {
+          summary += highestInsight.reason + " ";
+        } else if (highestInsight?.explainability?.segment_rationale) {
+          const rationale = highestInsight.explainability.segment_rationale.split('.')[0].trim();
+          if (rationale) {
+            summary += rationale + ". ";
+          }
+        }
+        
+        // Information about the lowest segment dengan reason
         if (lowestSegment.segment_id !== highestSegment.segment_id && filteredSegments.length > 1) {
           const lowestSegmentName = lowestSegment.segment_name || `Segment ${lowestSegment.segment_id}`;
           summary += `${lowestSegmentName} (${lowestSegment.respondent_count} respondents) has lower satisfaction at ${lowestSegment.satisfaction_percentage.toFixed(1)}%`;
           if (lowestSegment.dominant_preference && lowestSegment.dominant_preference !== "N/A") {
             summary += ` and tends toward "${lowestSegment.dominant_preference}"`;
           }
-          summary += `. This segment may benefit from targeted improvements to enhance satisfaction.`;
+          summary += `. `;
+          
+          // Cari reason dari segment insights untuk lowest segment
+          const lowestInsight = segmentInsights.find((insight: any) => 
+            String(insight.segment_id) === String(lowestSegment.segment_id)
+          );
+          if (lowestInsight?.reason) {
+            summary += lowestInsight.reason + " ";
+          } else if (lowestInsight?.explainability?.recommendation_rationale) {
+            const rationale = lowestInsight.explainability.recommendation_rationale.split('.')[0].trim();
+            if (rationale) {
+              summary += rationale + ". ";
+            }
+          } else {
+            summary += `This segment may benefit from targeted improvements to enhance satisfaction.`;
+          }
         }
         
         return summary;

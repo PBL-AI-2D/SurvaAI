@@ -69,10 +69,10 @@ export function generateAIInsightSummary(satisfactionData: SatisfactionData | nu
 
   const { satisfied, neutral, unsatisfied, total_respondents, major_preference, segments, segment_insights } = satisfactionData;
   
-  // Clamp percentages to range 0-100%
-  const satisfiedPct = Math.min(Math.max(Number(satisfied) || 0, 0), 100).toFixed(1);
-  const neutralPct = Math.min(Math.max(Number(neutral) || 0, 0), 100).toFixed(1);
-  const unsatisfiedPct = Math.min(Math.max(Number(unsatisfied) || 0, 0), 100).toFixed(1);
+  // Clamp percentages to range 0-100% (keep as numbers, not strings)
+  const satisfiedPct = Math.min(Math.max(Number(satisfied) || 0, 0), 100);
+  const neutralPct = Math.min(Math.max(Number(neutral) || 0, 0), 100);
+  const unsatisfiedPct = Math.min(Math.max(Number(unsatisfied) || 0, 0), 100);
 
   // Determine trend from segment insights if available
   let trend = "stable";
@@ -105,18 +105,59 @@ export function generateAIInsightSummary(satisfactionData: SatisfactionData | nu
     bestSegment = topSegment.segment_name || `Segment ${topSegment.segment_id}` || "";
   }
 
-  // Build base insight summary (synchronized with Conclusion)
+  // Build base insight summary menggunakan IKG jika tersedia
+  const satisfactionDataTyped = satisfactionData as any;
+  const ikgIndex = satisfactionDataTyped?.combined_satisfaction_index;
+  const ikgLabel = satisfactionDataTyped?.combined_satisfaction_label;
+  const ikgDist = satisfactionDataTyped?.distribution_combined_satisfaction;
+  const weightMetadata = satisfactionDataTyped?.weight_metadata;
+  const validationMetrics = satisfactionDataTyped?.validation_metrics;
+  
+  // Gunakan IKG distribution jika tersedia (keep as numbers)
+  let finalSatisfiedPct: number = satisfiedPct;
+  let finalNeutralPct: number = neutralPct;
+  let finalUnsatisfiedPct: number = unsatisfiedPct;
+  
+  if (ikgDist && total_respondents > 0) {
+    finalSatisfiedPct = ((ikgDist.puas || 0) / total_respondents) * 100;
+    finalNeutralPct = ((ikgDist.netral || 0) / total_respondents) * 100;
+    finalUnsatisfiedPct = ((ikgDist.tidak_puas || 0) / total_respondents) * 100;
+  }
+  
   const avgSatisfaction = segments && segments.length > 0
     ? (segments.reduce((sum, seg) => sum + seg.satisfaction_percentage, 0) / segments.length).toFixed(1)
-    : "0.0";
+    : ikgIndex !== undefined 
+      ? ikgIndex.toFixed(1)
+      : "0.0";
   
-  let insight = `Based on the latest survey with ${total_respondents} respondents, customer satisfaction shows ${satisfiedPct}% satisfied, ${neutralPct}% neutral, and ${unsatisfiedPct}% unsatisfied. `;
+  let insight = "";
+  
+  if (ikgIndex !== undefined) {
+    insight = `Based on the latest survey with ${total_respondents} respondents, the Combined Satisfaction Index (IKG) is ${ikgIndex.toFixed(1)}% (${ikgLabel || 'Netral'}). `;
+    insight += `The satisfaction distribution based on IKG shows ${finalSatisfiedPct.toFixed(1)}% satisfied, ${finalNeutralPct.toFixed(1)}% neutral, and ${finalUnsatisfiedPct.toFixed(1)}% unsatisfied. `;
+  } else {
+    insight = `Based on the latest survey with ${total_respondents} respondents, customer satisfaction shows ${finalSatisfiedPct.toFixed(1)}% satisfied, ${finalNeutralPct.toFixed(1)}% neutral, and ${finalUnsatisfiedPct.toFixed(1)}% unsatisfied. `;
+  }
+
+  // Tambahkan explanation tentang dynamic weighting
+  if (weightMetadata && weightMetadata.method === "dynamic") {
+    insight += `The analysis uses dynamic weighting based on data availability: ${weightMetadata.likert_availability} Likert responses, ${weightMetadata.sentiment_availability} sentiment data, and ${weightMetadata.preference_availability} preference data. `;
+  }
 
   if (major_preference) {
     insight += `The most preferred category or feature is ${major_preference.name} (${major_preference.percentage.toFixed(1)}%). `;
   }
 
-  insight += `The average satisfaction score is ${avgSatisfaction}%. `;
+  if (ikgIndex !== undefined) {
+    insight += `The Combined Satisfaction Index is ${ikgIndex.toFixed(1)}%. `;
+  } else {
+    insight += `The average satisfaction score is ${avgSatisfaction}%. `;
+  }
+  
+  // Tambahkan validation metrics jika tersedia
+  if (validationMetrics && validationMetrics.interpretation) {
+    insight += `${validationMetrics.interpretation} (System validation: Mean Absolute Deviation = ${validationMetrics.mean_absolute_deviation.toFixed(2)}). `;
+  }
 
   if (bestSegment) {
     insight += `The best customer segment is ${bestSegment}. `;
@@ -168,8 +209,10 @@ export function generateAIInsightSummary(satisfactionData: SatisfactionData | nu
 
     const priorityInsight = sortedInsights[0];
     
-    // Use recommendation_rationale if available, or recommendation
-    if (priorityInsight.explainability?.recommendation_rationale) {
+    // Prioritaskan reason jika tersedia, lalu recommendation_rationale, lalu recommendation
+    if (priorityInsight.reason) {
+      insight += priorityInsight.reason;
+    } else if (priorityInsight.explainability?.recommendation_rationale) {
       insight += priorityInsight.explainability.recommendation_rationale;
     } else if (priorityInsight.recommendation) {
       // Get main recommendation from segment with biggest problem

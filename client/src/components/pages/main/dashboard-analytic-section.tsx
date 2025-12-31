@@ -142,8 +142,34 @@ export function DashboardAnalyticSection({
 
     const majorPref = satisfactionData.major_preference;
 
-    // Tema: Dashboard Analytic Overview - fokus pada metrics dan analytics dengan explainability
-    let conclusion = `AI model analysis based on ${totalRespondents} completed responses shows an average satisfaction of ${avgSatisfaction}%. `;
+    // Tema: Dashboard Analytic Overview - menggunakan explainability dan reason dari backend
+    let conclusion = "";
+    
+    // Gunakan Combined Satisfaction Index (IKG) jika tersedia
+    const ikgIndex = satisfactionData.combined_satisfaction_index;
+    const ikgLabel = satisfactionData.combined_satisfaction_label;
+    const avgConfidence = satisfactionData.average_sentiment_confidence;
+    const weightMetadata = satisfactionData.weight_metadata;
+    const validationMetrics = satisfactionData.validation_metrics;
+    
+    if (ikgIndex !== undefined) {
+      conclusion = `AI model analysis based on ${totalRespondents} completed responses shows a Combined Satisfaction Index (IKG) of ${ikgIndex.toFixed(1)}% (${ikgLabel || 'Netral'}). `;
+    } else {
+      conclusion = `AI model analysis based on ${totalRespondents} completed responses shows an average satisfaction of ${avgSatisfaction}%. `;
+    }
+    
+    // Tambahkan weight metadata explanation jika menggunakan dynamic weighting
+    if (weightMetadata && weightMetadata.method === "dynamic") {
+      conclusion += `The system uses dynamic weighting based on data availability: ${weightMetadata.likert_availability} Likert data, ${weightMetadata.sentiment_availability} sentiment data, ${weightMetadata.preference_availability} preference data. `;
+      if (avgConfidence !== undefined) {
+        conclusion += `Average sentiment confidence: ${(avgConfidence * 100).toFixed(0)}%. `;
+      }
+    }
+    
+    // Tambahkan validation metrics
+    if (validationMetrics && validationMetrics.interpretation) {
+      conclusion += `${validationMetrics.interpretation} (Mean Absolute Deviation: ${validationMetrics.mean_absolute_deviation.toFixed(2)}). `;
+    }
     
     if (bestSegment) {
       const segmentName = bestSegment.cluster_label || bestSegment.segment_name || `Segment ${bestSegment.segment_id || bestSegment.id}`;
@@ -162,58 +188,49 @@ export function DashboardAnalyticSection({
       
       conclusion += `${segmentName} shows the highest satisfaction at ${satisfactionPct}% (${segmentSize} respondent${segmentSize > 1 ? 's' : ''}). `;
       
-      // Add explainability data if available (from database or Python response)
+      // Prioritaskan reason dari segment_insights jika ada
+      const matchingInsight = segmentInsights.find((insight: any) => {
+        const segmentId = String(bestSegment.segment_id || bestSegment.id || '');
+        return String(insight.segment_id || '') === segmentId;
+      });
+      
+      if (matchingInsight?.reason) {
+        // Gunakan reason dari segment insight
+        conclusion += matchingInsight.reason + " ";
+      } else {
+        // Fallback ke segment_rationale atau explainability
       const segmentRationale = bestSegment.segment_rationale || 
                                (bestSegment as any).explainability?.segment_rationale;
       if (segmentRationale && segmentRationale.trim()) {
-        // Use first sentence of rationale for conclusion
         const rationaleFirstSentence = segmentRationale.split('.')[0].trim();
         if (rationaleFirstSentence) {
           conclusion += `${rationaleFirstSentence}. `;
         }
       }
-      
-      // Add top features if available (from database or Python response)
-      const topFeatures = bestSegment.top_features || 
-                         (bestSegment as any).explainability?.top_features;
-      if (topFeatures && Array.isArray(topFeatures) && topFeatures.length > 0) {
-        const topFeature = topFeatures[0];
-        const featureName = typeof topFeature === 'string' 
-          ? topFeature 
-          : (topFeature?.feature || topFeature?.name || '');
-        if (featureName && featureName.trim()) {
-          conclusion += `Key feature influencing this segment: ${featureName}. `;
-        }
-      }
-      
-      // Add confidence info if available (from database or Python response)
-      const confidenceScore = bestSegment.confidence_score !== undefined && bestSegment.confidence_score !== null
-        ? bestSegment.confidence_score
-        : (bestSegment as any).confidence;
-      if (confidenceScore !== undefined && confidenceScore !== null) {
-        const confidencePct = (confidenceScore * 100).toFixed(0);
-        const confidenceLabel = bestSegment.confidence_label || 
-                                (bestSegment as any).confidence_label ||
-          (confidenceScore >= 0.8 ? 'High' : 
-           confidenceScore >= 0.6 ? 'Medium' : 'Low');
-        conclusion += `Analysis confidence: ${confidenceLabel} (${confidencePct}%). `;
-        
-        const lowConfidenceWarning = bestSegment.low_confidence_warning !== undefined 
-          ? bestSegment.low_confidence_warning 
-          : (bestSegment as any).low_confidence_warning;
-        if (lowConfidenceWarning) {
-          conclusion += `Note: Low confidence warning - data may not be fully representative. `;
-        }
       }
     }
-
-    // Trend prediction
+      
+    // Trend prediction menggunakan IKG distribution jika tersedia
+    const ikgDist = satisfactionData.distribution_combined_satisfaction;
+    if (ikgDist) {
+      const ikgSatisfiedPct = (ikgDist.puas / totalRespondents) * 100;
+      const ikgUnsatisfiedPct = (ikgDist.tidak_puas / totalRespondents) * 100;
+      if (ikgSatisfiedPct >= 60) {
+        conclusion += `The satisfaction trend is positive with ${ikgSatisfiedPct.toFixed(1)}% satisfied responses (based on Combined Satisfaction Index). `;
+      } else if (ikgUnsatisfiedPct >= 40) {
+        conclusion += `The satisfaction trend indicates concerns with ${ikgUnsatisfiedPct.toFixed(1)}% unsatisfied responses (based on Combined Satisfaction Index). `;
+      } else {
+        conclusion += `The satisfaction trend is stable with balanced responses (based on Combined Satisfaction Index). `;
+        }
+    } else {
+      // Fallback ke satisfaction percentage lama
     if (satisfiedPct >= 60) {
       conclusion += `The satisfaction trend is positive with ${satisfiedPct.toFixed(1)}% satisfied responses. `;
     } else if (satisfiedPct < 40) {
       conclusion += `The satisfaction trend indicates concerns with ${unsatisfiedPct.toFixed(1)}% unsatisfied responses. `;
     } else {
       conclusion += `The satisfaction trend is stable with balanced responses. `;
+      }
     }
 
     if (majorPref) {

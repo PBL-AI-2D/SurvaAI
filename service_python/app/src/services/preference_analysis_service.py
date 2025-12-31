@@ -2,8 +2,13 @@
 Service untuk analisis preferensi dari categorical features.
 Mengidentifikasi dan mengekstrak preferensi produk/features yang disukai responden.
 """
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from collections import Counter
+
+try:
+    from .sentiment_analysis_service import predict_single as sentiment_predict_single
+except ImportError:
+    sentiment_predict_single = None
 
 
 def is_product_feature_question(question_text: str) -> bool:
@@ -265,4 +270,133 @@ def extract_preference_from_categorical(
     
     # Return top preferences (max 20 untuk menghindari terlalu banyak)
     return {pref: pct for pref, pct in sorted_preferences[:20]}
+
+
+def map_preference_value_to_score(value: str) -> Optional[float]:
+    """
+    Mapping jawaban kategorikal bernuansa kepuasan ke skor 0‑100.
+    
+    Menggunakan hybrid approach:
+    1. Rule-based untuk kata-kata yang jelas (cepat dan akurat)
+    2. Sentiment model sebagai fallback untuk variasi bahasa
+    
+    Aturan semantik utama:
+    - "sangat puas"      -> 90
+    - "puas"             -> 80
+    - "biasa saja/netral"-> 65
+    - "tidak puas/kurang puas" -> 40
+
+    Alasan mapping:
+    - Skala dibuat konsisten dengan sentimen: sangat puas di atas 85,
+      puas sedikit di bawah, netral di area menengah, tidak puas cukup
+      rendah namun tidak 0 agar tetap bisa digabung dengan indikator lain.
+    """
+    if not value:
+        return None
+
+    v = str(value).strip().lower()
+
+    # Rule-based mapping untuk kata-kata yang jelas
+    # Sangat puas / sangat senang
+    if "sangat puas" in v or ("sangat" in v and "puas" in v) or "sangat senang" in v:
+        return 90.0
+
+    # Tidak puas / kurang puas
+    if "tidak puas" in v or "kurang puas" in v or ("tidak" in v and "puas" in v) or "kecewa" in v:
+        return 40.0
+
+    # Netral / biasa saja
+    if "biasa saja" in v or "biasa" in v or "netral" in v or "lumayan" in v or "oke" in v:
+        return 65.0
+
+    # Puas (tanpa modifier "sangat" / "tidak")
+    if "puas" in v or "senang" in v:
+        return 80.0
+    
+    # Fallback: Gunakan sentiment model untuk variasi bahasa yang tidak tertangkap
+    # Contoh: "cukup puas", "biasa tapi oke", "kecewa berat", dll
+    if sentiment_predict_single is not None:
+        try:
+            pred = sentiment_predict_single(value)
+            label = pred.get("label", "neutral").lower()
+            confidence = pred.get("confidence", 0.5)
+            
+            # Mapping berdasarkan sentiment label
+            if label == "positive":
+                # Positive dengan confidence tinggi = sangat puas, sedang = puas
+                if confidence >= 0.8:
+                    return 90.0
+                elif confidence >= 0.6:
+                    return 85.0
+                else:
+                    return 80.0
+            elif label == "negative":
+                # Negative dengan confidence tinggi = tidak puas, sedang = kurang puas
+                if confidence >= 0.8:
+                    return 35.0
+                elif confidence >= 0.6:
+                    return 40.0
+                else:
+                    return 50.0
+            else:  # neutral
+                # Neutral dengan confidence tinggi = netral, rendah = agak puas
+                if confidence >= 0.7:
+                    return 65.0
+                else:
+                    return 70.0
+        except Exception:
+            # Jika sentiment model error, return None (komponen ini tidak dipakai)
+            pass
+
+    return None
+
+
+def compute_preference_scores_from_categorical(
+    categorical: List[Dict[str, Any]]
+) -> List[Optional[float]]:
+    """
+    Hitung skor kepuasan berbasis jawaban dropdown / multiple choice / checkbox.
+
+    Untuk tiap responden:
+    - Ambil semua nilai kategorikal (termasuk array / checkbox).
+    - Mapping dengan map_preference_value_to_score.
+    - Jika ada lebih dari satu jawaban kepuasan, diambil rata‑ratanya.
+
+    Alasan fallback:
+    - Jika tidak ada satu pun nilai yang bisa di‑mapping, kembalikan None
+      agar komponen ini tidak dipakai dalam IKG responden.
+    """
+    result: List[Optional[float]] = []
+
+    for ans in categorical:
+        if not ans or not isinstance(ans, dict):
+            result.append(None)
+            continue
+
+        scores: List[float] = []
+
+        for raw_val in ans.values():
+            if raw_val is None:
+                continue
+
+            # Handle checkbox (list) dan single value
+            values_to_check: List[Any]
+            if isinstance(raw_val, list):
+                values_to_check = raw_val
+            elif isinstance(raw_val, (set, tuple)):
+                values_to_check = list(raw_val)
+            else:
+                values_to_check = [raw_val]
+
+            for v in values_to_check:
+                score = map_preference_value_to_score(str(v))
+                if score is not None:
+                    scores.append(score)
+
+        if scores:
+            result.append(float(sum(scores) / len(scores)))
+        else:
+            result.append(None)
+
+    return result
 

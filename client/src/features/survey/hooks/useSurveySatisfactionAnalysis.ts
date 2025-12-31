@@ -212,6 +212,76 @@ export const useSurveySatisfactionAnalysis = (
               low_confidence_warning: Boolean(insight.low_confidence_warning || false),
             }))
           : [],
+        // IKG Explainability & System Validity
+        ikg_explainability: Array.isArray(pythonData.ikg_explainability)
+          ? pythonData.ikg_explainability.map((exp: any) => ({
+              respondent_index: Number(exp.respondent_index || 0),
+              ikg_value: Number(exp.ikg_value || 0),
+              label: (exp.label || "Netral") as "Puas" | "Netral" | "Tidak Puas",
+              components_used: Array.isArray(exp.components_used) ? exp.components_used.map(String) : [],
+              component_scores: {
+                likert: typeof exp.component_scores?.likert === "number" ? exp.component_scores.likert : undefined,
+                sentiment: typeof exp.component_scores?.sentiment === "number" ? exp.component_scores.sentiment : undefined,
+                preference: typeof exp.component_scores?.preference === "number" ? exp.component_scores.preference : undefined,
+              },
+              weights_applied: {
+                likert: Number(exp.weights_applied?.likert || 0),
+                sentiment: Number(exp.weights_applied?.sentiment || 0),
+                preference: Number(exp.weights_applied?.preference || 0),
+              },
+              base_weights: {
+                likert: Number(exp.base_weights?.likert || 0),
+                sentiment: Number(exp.base_weights?.sentiment || 0),
+                preference: Number(exp.base_weights?.preference || 0),
+              },
+              adaptive_adjustment: String(exp.adaptive_adjustment || ""),
+              explanation: String(exp.explanation || ""),
+              reason: String(exp.reason || ""),
+              sentiment_confidence: typeof exp.sentiment_confidence === "number" ? exp.sentiment_confidence : undefined,
+              detected_language: String(exp.detected_language || "unknown"),
+              details: {
+                likert_details: Array.isArray(exp.details?.likert_details) ? exp.details.likert_details.map(String) : [],
+                preference_details: Array.isArray(exp.details?.preference_details) ? exp.details.preference_details.map(String) : [],
+              },
+            }))
+          : undefined,
+        sentiment_confidence_scores: Array.isArray(pythonData.sentiment_confidence_scores)
+          ? pythonData.sentiment_confidence_scores.map((score: any) => 
+              typeof score === "number" ? score : undefined
+            )
+          : undefined,
+        average_sentiment_confidence: typeof pythonData.average_sentiment_confidence === "number"
+          ? pythonData.average_sentiment_confidence
+          : undefined,
+        weight_metadata: pythonData.weight_metadata ? {
+          method: (pythonData.weight_metadata.method || "default") as "dynamic" | "default",
+          likert_availability: String(pythonData.weight_metadata.likert_availability || ""),
+          sentiment_availability: String(pythonData.weight_metadata.sentiment_availability || ""),
+          preference_availability: String(pythonData.weight_metadata.preference_availability || ""),
+          avg_confidence: Number(pythonData.weight_metadata.avg_confidence || 0),
+          low_confidence_ratio: String(pythonData.weight_metadata.low_confidence_ratio || ""),
+        } : undefined,
+        validation_metrics: pythonData.validation_metrics ? {
+          mean_absolute_deviation: Number(pythonData.validation_metrics.mean_absolute_deviation || 0),
+          max_deviation: typeof pythonData.validation_metrics.max_deviation === "number" 
+            ? pythonData.validation_metrics.max_deviation 
+            : undefined,
+          min_deviation: typeof pythonData.validation_metrics.min_deviation === "number"
+            ? pythonData.validation_metrics.min_deviation
+            : undefined,
+          interpretation: String(pythonData.validation_metrics.interpretation || ""),
+        } : undefined,
+        combined_satisfaction_index: typeof pythonData.combined_satisfaction_index === "number"
+          ? pythonData.combined_satisfaction_index
+          : undefined,
+        combined_satisfaction_label: pythonData.combined_satisfaction_label
+          ? (pythonData.combined_satisfaction_label as "Puas" | "Netral" | "Tidak Puas")
+          : undefined,
+        distribution_combined_satisfaction: pythonData.distribution_combined_satisfaction ? {
+          puas: Number(pythonData.distribution_combined_satisfaction.puas || 0),
+          netral: Number(pythonData.distribution_combined_satisfaction.netral || 0),
+          tidak_puas: Number(pythonData.distribution_combined_satisfaction.tidak_puas || 0),
+        } : undefined,
       };
     },
     enabled: enabled && !!surveyId,
