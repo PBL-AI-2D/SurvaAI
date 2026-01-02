@@ -153,7 +153,8 @@ export function DashboardAnalyticSection({
     const validationMetrics = satisfactionData.validation_metrics;
     
     if (ikgIndex !== undefined) {
-      conclusion = `AI model analysis based on ${totalRespondents} completed responses shows a Combined Satisfaction Index (IKG) of ${ikgIndex.toFixed(1)}% (${ikgLabel || 'Netral'}). `;
+      const ikgLabelText = ikgLabel ? ` (${ikgLabel})` : "";
+      conclusion = `AI model analysis based on ${totalRespondents} completed responses shows a Combined Satisfaction Index (IKG) of ${ikgIndex.toFixed(1)}%${ikgLabelText}. `;
     } else {
       conclusion = `AI model analysis based on ${totalRespondents} completed responses shows an average satisfaction of ${avgSatisfaction}%. `;
     }

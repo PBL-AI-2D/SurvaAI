@@ -17,7 +17,8 @@ from .preference_analysis_service import (
 )
 from .eti_service import calculate_trend_from_satisfaction
 from .segment_transformation_service import transform_segments_to_details
-from .ikg_service import compute_combined_satisfaction_index
+# compute_combined_satisfaction_index is provided by satisfaction_analysis_service;
+# dashboard should consume IKG via analyze_satisfaction to avoid duplicate computation.
 
 try:
     from .recommendation_service import generate_recommendations
@@ -183,12 +184,15 @@ def generate_dashboard_data(
     total_respondents = len(responses)
     
     # 4. Jalankan AI-1: Analisis Kepuasan
+    # Dashboard tidak lagi menghitung metrik kepuasan secara terpisah, 
+    # tetapi hanya mengonsumsi hasil dari satisfaction_analysis_service.
     ai1_result = analyze_satisfaction(
         responses=responses,
         likert_min=likert_min,
         likert_max=likert_max,
     )
     
+    # final_satisfaction_scores dari ai1_result sekarang sudah merupakan IKG (0-1)
     satisfaction_scores = ai1_result.get("final_satisfaction_scores", [])
     sentiment_scores = [
         s if s is not None else 0.5
@@ -199,22 +203,15 @@ def generate_dashboard_data(
         satisfaction_scores,
     )
 
-    # 5. Hitung Indeks Kepuasan Gabungan (IKG) dengan bobot & explainability
-    combined_index_result = compute_combined_satisfaction_index(
-        raw_responses=responses,
-        categorical_features=categorical_features,
-        sentiment_labels=ai1_result.get("sentiment_labels", []),
-        sentiment_confidence_scores=ai1_result.get("sentiment_confidence_scores", []),
-        likert_min_val=likert_min,
-        likert_max_val=likert_max,
-    )
+    # 5. Dashboard consumes IKG data ONLY from satisfaction_analysis_service
+    # (analyze_satisfaction now exposes IKG metadata to avoid duplicate computation).
+    eti_scores = ai1_result.get("eti_scores", [])
+    ikg_per_respondent = ai1_result.get("ikg_per_respondent_100", [])
+    ikg_survey = ai1_result.get("ikg_survey_index_100", 0.0)
+    ikg_distribution = ai1_result.get("ikg_distribution", {})
+    weight_metadata = ai1_result.get("ikg_weight_metadata", {})
 
-    ikg_per_respondent: List[float] = combined_index_result["per_respondent"]
-    ikg_survey: float = combined_index_result["survey_index"]
-    ikg_distribution = combined_index_result["distribution"]
-    weight_metadata = combined_index_result.get("weight_metadata", {})
-
-    # Konversi IKG 0‑100 ke 0‑1 untuk reuse di chart & metrik rata‑rata
+    # Konversi IKG 0‑100 ke 0‑1 untuk use by downstream components that expect 0-1
     ikg_scores_0_1: List[float] = [
         (score / 100.0) if score is not None else 0.0 for score in ikg_per_respondent
     ]
@@ -292,7 +289,9 @@ def generate_dashboard_data(
     )
     
     # 13. Calculate trend menggunakan IKG scores (bukan satisfaction_scores lama)
-    satisfaction_trend = calculate_trend_from_satisfaction(ikg_scores_0_1)
+    # Defaulting to 1 batch for now as dashboard typically handles current survey.
+    # If historical data is available, this should be passed here.
+    satisfaction_trend = calculate_trend_from_satisfaction(ikg_scores_0_1, num_batches=1)
     
     # 14. Generate segment insights (recommendations)
     segment_insights = []
@@ -310,7 +309,7 @@ def generate_dashboard_data(
     
     # 16. Rata-rata confidence score untuk survei
     avg_confidence = None
-    conf_scores = combined_index_result.get("confidence_scores", [])
+    conf_scores = ai1_result.get("ikg_confidence_scores", [])
     valid_conf = [c for c in conf_scores if c is not None]
     if valid_conf:
         avg_confidence = float(sum(valid_conf) / len(valid_conf))
@@ -332,7 +331,7 @@ def generate_dashboard_data(
             "explainability": {
                 "weight_method": weight_metadata.get("method", "default"),
                 "weight_details": weight_metadata,
-                "validation": combined_index_result.get("validation_metrics", {}),
+                "validation": ai1_result.get("ikg_validation_metrics", {}),
                 "avg_confidence": avg_confidence,
             },
         },
@@ -369,6 +368,7 @@ def generate_dashboard_data(
         "chart_data": {
             # Gunakan IKG (0‑1) sebagai dasar grafik kepuasan responden,
             # sehingga mencerminkan kombinasi Likert + teks + pilihan.
+            "eti_scores": eti_scores,
             "satisfaction_scores": ikg_scores_0_1,
             "sentiment_scores": sentiment_scores,
             "sentiment_labels": ai1_result.get("sentiment_labels", []),
@@ -405,12 +405,13 @@ def generate_dashboard_data(
     dashboard_data["distribution_combined_satisfaction"] = ikg_distribution
     
     # Tambahan: Explainability dan Confidence Scores untuk setiap responden
-    dashboard_data["ikg_explainability"] = combined_index_result.get("explainability", [])
-    dashboard_data["sentiment_confidence_scores"] = combined_index_result.get("confidence_scores", [])
+    # Backward compatible fields: use values from analyze_satisfaction's IKG metadata
+    dashboard_data["ikg_explainability"] = ai1_result.get("ikg_explainability", [])
+    dashboard_data["sentiment_confidence_scores"] = ai1_result.get("ikg_confidence_scores", [])
     dashboard_data["average_sentiment_confidence"] = avg_confidence
     
-    # Tambahan: Weight metadata dan validation metrics
-    dashboard_data["weight_metadata"] = combined_index_result.get("weight_metadata", {})
-    dashboard_data["validation_metrics"] = combined_index_result.get("validation_metrics", {})
+    # Tambahan: Weight metadata dan validation metrics (dari analyze_satisfaction IKG metadata)
+    dashboard_data["weight_metadata"] = weight_metadata
+    dashboard_data["validation_metrics"] = ai1_result.get("ikg_validation_metrics", {})
     
     return dashboard_data

@@ -60,6 +60,10 @@ export const useSurveyAIClassification = (
 
       // Transform Python service response to our format
       const pythonData = classificationResult.data;
+
+      // Debug: log raw Python response for analytics mapping verification
+      // eslint-disable-next-line no-console
+      console.log("IKG API RESPONSE (AI classification)", pythonData);
       
       // Safe access to sentiment_distribution with fallback
       // Prioritize sentiment_distribution from satisfaction_overview
@@ -76,15 +80,17 @@ export const useSurveyAIClassification = (
             positive: Math.round((satisfactionPct.satisfied || 0) * total / 100),
             negative: Math.round((satisfactionPct.unsatisfied || 0) * total / 100),
             neutral: Math.round((satisfactionPct.neutral || 0) * total / 100),
-          };
-        } else {
-          // Final fallback: use satisfaction scores to derive sentiment
-          const satisfactionScores = pythonData.chart_data?.satisfaction_scores || [];
-          if (satisfactionScores.length > 0) {
-            let positive = 0, negative = 0, neutral = 0;
-            satisfactionScores.forEach((score: number) => {
-              if (score > 0.7) positive++;
-              else if (score < 0.3) negative++;
+          })),
+          satisfaction_scores: (pythonData.chart_data?.satisfaction_scores || []).map((score, idx) => ({
+            index: idx + 1,
+            score: score * 100, // Convert to percentage
+          })),
+          // Expose raw IKG per respondent 0-100 for consumers that need original scale
+          ikg_raw_scores: Array.isArray(pythonData.ikg_per_respondent_100)
+            ? pythonData.ikg_per_respondent_100.map((s: any, idx: number) => ({ index: idx + 1, score: Number(s || 0) }))
+            : Array.isArray(pythonData.per_respondent)
+              ? pythonData.per_respondent.map((s: any, idx: number) => ({ index: idx + 1, score: Number(s || 0) }))
+              : [],
               else neutral++;
             });
             sentimentDist = { positive, negative, neutral };
@@ -114,6 +120,10 @@ export const useSurveyAIClassification = (
           index: idx + 1,
           score: score * 100, // Convert to percentage
         })),
+y        // Expose raw IKG per respondent 0-100 for consumers that need original scale
+        ikg_raw_scores: Array.isArray(pythonData.ikg_per_respondent_100)
+          ? pythonData.ikg_per_respondent_100.map((s: any, idx: number) => ({ index: idx + 1, score: Number(s || 0) }))
+          : [],
         segments: (pythonData.segmentation?.segment_details || []).map((segment) => ({
           segment_id: segment.segment_id,
           respondent_count: segment.respondent_count,

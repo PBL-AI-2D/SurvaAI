@@ -39,20 +39,36 @@ export function AIAnalysisSurveySection({
 
   // Process trend data
   const satisfactionTrendData = satisfactionData && responSurveis
-    ? processSatisfactionTrend(responSurveis, satisfactionData)
+    ? processSatisfactionTrend(responSurveis, satisfactionData as any)
     : undefined;
 
   const isLoading = isLoadingSatisfaction || isLoadingResponses;
 
+  // Cast query data to any to avoid strict typing mismatches from react-query generics
+  const satisfactionDataAny = satisfactionData as any;
+
+  // Determine which source to use for classification chart percentages.
+  // Prefer IKG distribution from backend (counts) and convert to percentages.
+  let classificationPercentages = satisfactionData?.satisfaction_percentage;
+  if (satisfactionDataAny?.distribution_combined_satisfaction && satisfactionDataAny.total_respondents > 0) {
+    const d = satisfactionDataAny.distribution_combined_satisfaction;
+    const total = Number(satisfactionDataAny.total_respondents || 0);
+    classificationPercentages = {
+      satisfied: (Number(d.puas || 0) / total) * 100,
+      neutral: (Number(d.netral || 0) / total) * 100,
+      unsatisfied: (Number(d.tidak_puas || 0) / total) * 100,
+    };
+  }
+
   // Generate conclusion sesuai tema Satisfaction & Preference Overview menggunakan IKG dan explainability
-  const conclusion = satisfactionData
+  const conclusion = satisfactionDataAny
     ? (() => {
-        const totalRespondents = satisfactionData.total_respondents;
-        const ikgIndex = satisfactionData.combined_satisfaction_index;
-        const ikgLabel = satisfactionData.combined_satisfaction_label;
-        const ikgDist = satisfactionData.distribution_combined_satisfaction;
-        const majorPref = satisfactionData.major_preference;
-        const weightMetadata = satisfactionData.weight_metadata;
+        const totalRespondents = satisfactionDataAny.total_respondents;
+        const ikgIndex = satisfactionDataAny.combined_satisfaction_index;
+        const ikgLabel = satisfactionDataAny.combined_satisfaction_label;
+        const ikgDist = satisfactionDataAny.distribution_combined_satisfaction;
+        const majorPref = satisfactionDataAny.major_preference;
+        const weightMetadata = satisfactionDataAny.weight_metadata;
         
         // Gunakan IKG distribution jika tersedia, fallback ke satisfaction_percentage lama
         let satisfiedPct: number;
@@ -73,14 +89,15 @@ export function AIAnalysisSurveySection({
         let conclusionText = "";
         
         if (ikgIndex !== undefined) {
-          conclusionText = `Based on ${totalRespondents} completed responses, the Combined Satisfaction Index (IKG) is ${ikgIndex.toFixed(1)}% (${ikgLabel || 'Netral'}). `;
+          const ikgLabelText = ikgLabel ? ` (${ikgLabel})` : "";
+          conclusionText = `Based on ${totalRespondents} completed responses, the Combined Satisfaction Index (IKG) is ${ikgIndex.toFixed(1)}%${ikgLabelText}. `;
           conclusionText += `The satisfaction distribution based on IKG shows ${satisfiedPct.toFixed(1)}% satisfied`;
           if (neutralPct > 0) {
             conclusionText += `, ${neutralPct.toFixed(1)}% neutral`;
           }
           conclusionText += `, and ${unsatisfiedPct.toFixed(1)}% unsatisfied. `;
         } else {
-          const avgSatisfaction = (satisfactionData.average_satisfaction * 100).toFixed(1);
+          const avgSatisfaction = (satisfactionDataAny.average_satisfaction * 100).toFixed(1);
           conclusionText = `Based on ${totalRespondents} completed responses, the satisfaction distribution shows ${satisfiedPct.toFixed(1)}% satisfied`;
           if (neutralPct > 0) {
             conclusionText += `, ${neutralPct.toFixed(1)}% neutral`;
@@ -151,7 +168,7 @@ export function AIAnalysisSurveySection({
           </h4>
           <div className="flex-1 min-h-[400px]">
             <ClassificationChart
-              satisfactionPercentage={satisfactionData?.satisfaction_percentage}
+              satisfactionPercentage={classificationPercentages}
               isLoading={isLoading}
             />
           </div>
@@ -159,7 +176,7 @@ export function AIAnalysisSurveySection({
 
         <div className="bg-background rounded-lg p-5 shadow-sm border border-border flex flex-col">
           <h4 className="text-sm font-semibold text-foreground mb-4">
-            Distribution by preference category
+            Top 8 preferensi responden (berdasarkan frekuensi jawaban)
           </h4>
           <div className="flex-1 min-h-[400px]">
             <PreferencesChart
@@ -171,11 +188,12 @@ export function AIAnalysisSurveySection({
 
         <div className="bg-background rounded-lg p-5 shadow-sm border border-border flex flex-col">
           <h4 className="text-sm font-semibold text-foreground mb-4">
-            Satisfaction trend over time
+            Satisfaction Expected Tren
           </h4>
           <div className="flex-1 min-h-[400px]">
             <SatisfactionTrendChart
-              data={satisfactionTrendData}
+              eti_scores={satisfactionTrendData?.eti_scores || []}
+              trend_predictions={satisfactionTrendData?.trend_predictions || []}
               isLoading={isLoading}
             />
           </div>

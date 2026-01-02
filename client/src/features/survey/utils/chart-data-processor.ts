@@ -60,7 +60,35 @@ export function processSatisfactionTrend(
   responses: ResponSurvei[],
   satisfactionData?: AIClassificationData
 ): WeeklySatisfactionData[] {
-  // Jika ada satisfaction scores dari analisis, gunakan itu
+  // Prefer raw IKG per-respondent if backend exposes it (0-100 values)
+  if (satisfactionData?.ikg_raw_scores && satisfactionData.ikg_raw_scores.length > 0) {
+    const scores = satisfactionData.ikg_raw_scores.map((s) => s.score);
+    const chunkSize = Math.max(1, Math.ceil(scores.length / 4));
+    const weeks: WeeklySatisfactionData[] = [];
+
+    for (let i = 0; i < 4; i++) {
+      const start = i * chunkSize;
+      const end = Math.min(start + chunkSize, scores.length);
+      const chunk = scores.slice(start, end);
+
+      if (chunk.length > 0) {
+        const avgSatisfaction = chunk.reduce((sum, s) => sum + s, 0) / chunk.length;
+        weeks.push({
+          week: `Week ${i + 1}`,
+          satisfaction: Math.round(avgSatisfaction),
+        });
+      }
+    }
+
+    return weeks.length > 0 ? weeks : [
+      { week: "Week 1", satisfaction: 0 },
+      { week: "Week 2", satisfaction: 0 },
+      { week: "Week 3", satisfaction: 0 },
+      { week: "Week 4", satisfaction: 0 },
+    ];
+  }
+
+  // Jika ada satisfaction scores dari analisis (legacy), gunakan itu
   if (satisfactionData?.satisfaction_scores && satisfactionData.satisfaction_scores.length > 0) {
     const scores = satisfactionData.satisfaction_scores;
     const chunkSize = Math.ceil(scores.length / 4);

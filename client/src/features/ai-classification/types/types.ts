@@ -145,6 +145,8 @@ export interface AIClassificationData {
     netral: number;
     tidak_puas: number;
   };
+  // Raw IKG per respondent (0-100) exposed by backend for detailed views
+  ikg_raw_scores?: SatisfactionScore[];
 }
 
 export interface AIClassificationResponse {

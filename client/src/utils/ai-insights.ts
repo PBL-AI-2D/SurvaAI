@@ -133,7 +133,8 @@ export function generateAIInsightSummary(satisfactionData: SatisfactionData | nu
   let insight = "";
   
   if (ikgIndex !== undefined) {
-    insight = `Based on the latest survey with ${total_respondents} respondents, the Combined Satisfaction Index (IKG) is ${ikgIndex.toFixed(1)}% (${ikgLabel || 'Netral'}). `;
+    const ikgLabelText = ikgLabel ? ` (${ikgLabel})` : "";
+    insight = `Based on the latest survey with ${total_respondents} respondents, the Combined Satisfaction Index (IKG) is ${ikgIndex.toFixed(1)}%${ikgLabelText}. `;
     insight += `The satisfaction distribution based on IKG shows ${finalSatisfiedPct.toFixed(1)}% satisfied, ${finalNeutralPct.toFixed(1)}% neutral, and ${finalUnsatisfiedPct.toFixed(1)}% unsatisfied. `;
   } else {
     insight = `Based on the latest survey with ${total_respondents} respondents, customer satisfaction shows ${finalSatisfiedPct.toFixed(1)}% satisfied, ${finalNeutralPct.toFixed(1)}% neutral, and ${finalUnsatisfiedPct.toFixed(1)}% unsatisfied. `;

@@ -306,12 +306,9 @@ def analyze_satisfaction(
     weights: Optional[Dict[str, float]] = None
 ) -> Dict[str, Any]:
     """
-    Fungsi Utama AI-1:
-    Menganalisa kepuasan berdasarkan SEMUA input (Likert, Teks, Pilihan).
-    
-    Args:
-        categorical_mapping: Dictionary untuk menilai jawaban pilihan.
-        Contoh: {'Apakah akan langganan lagi?': {'Ya': 1.0, 'Tidak': 0.0}}
+    Fungsi Utama AI-1: Menganalisa kepuasan responden.
+    Sekarang IKG (Indeks Kepuasan Gabungan) dari ikg_service digunakan sebagai output akhir
+    untuk konsistensi single source of truth di seluruh backend.
     """
     if not responses:
         return {}
@@ -319,28 +316,56 @@ def analyze_satisfaction(
     # 1. Extract Data
     likert_list = [r.get("likert", {}) for r in responses]
     texts = [r.get("text", "") for r in responses]
-    categorical_list = [r.get("categorical", {}) for r in responses] # Asumsi input ada key 'categorical'
+    categorical_list = [r.get("categorical", {}) for r in responses]
 
     # 2. Process Likert (0-1)
     likert_norm = _normalize_likert(likert_list, likert_min, likert_max)
     
-    # 3. Process Sentiment (0-1) - sekarang juga mengembalikan confidence scores
+    # 3. Process Sentiment (0-1)
     sentiment_labels, sentiment_scores, sentiment_confidence_scores = _run_sentiment(texts)
     
     # 4. Process Categorical Scoring (0-1)
-    # Jika tidak ada mapping, skor kategorikal dianggap NaN (tidak mempengaruhi nilai akhir)
     cat_scores = _score_categorical_answers(categorical_list, categorical_mapping or {})
     
-    # 5. Compute HOLISTIC Satisfaction Score
-    # Default weights jika user tidak memberi input
-    if weights is None:
-        weights = {"likert": 0.5, "sentiment": 0.4, "categorical": 0.1}
-        
-    final_scores = _compute_holistic_satisfaction(
-        likert_norm, sentiment_scores, cat_scores, weights
+    # 5. Hitung IKG melalui ikg_service untuk konsistensi single source of truth
+    # Kita import di sini untuk menghindari circular import jika ada
+    from .ikg_service import compute_combined_satisfaction_index
+    
+    ikg_result = compute_combined_satisfaction_index(
+        raw_responses=responses,
+        categorical_features=categorical_list,
+        sentiment_labels=sentiment_labels,
+        sentiment_confidence_scores=sentiment_confidence_scores,
+        likert_min_val=likert_min,
+        likert_max_val=likert_max
     )
 
-    # 6. Analisis Korelasi (Semua fitur vs Final Score)
+    # 5.1 Calculate ETI per respondent based on deviation from mean IKG
+    # Use ETI service to compute deviation-based ETI
+    from .eti_service import calculate_eti_score
+    ikg_per_respondent_100 = ikg_result.get("per_respondent", [])
+    eti_scores = calculate_eti_score(
+        sentiment_scores=sentiment_scores,
+        satisfaction_scores=ikg_per_respondent_100,
+        sentiment_confidence=sentiment_confidence_scores
+    )
+    
+    # Konversi IKG 0-100 ke 0-1 untuk pipeline internal yang lama
+    # NOTE: We keep the original IKG (0-100) available as well so
+    # downstream services can use the single source of truth without
+    # recomputing the index. This avoids duplicated calculations.
+    ikg_per_respondent_100 = ikg_result.get("per_respondent", [])
+    final_scores = [s / 100.0 for s in ikg_per_respondent_100]
+
+    # Expose IKG metadata (0-100) to callers for backward compatibility
+    ikg_survey_index_100 = ikg_result.get("survey_index")
+    ikg_distribution = ikg_result.get("distribution", {})
+    ikg_explainability = ikg_result.get("explainability", [])
+    ikg_confidence_scores = ikg_result.get("confidence_scores", [])
+    ikg_weight_metadata = ikg_result.get("weight_metadata", {})
+    ikg_validation_metrics = ikg_result.get("validation_metrics", {})
+
+    # 6. Analisis Korelasi (Semua fitur vs IKG)
     # Kita flatten likert agar bisa dikorelasikan per-pertanyaan
     flat_data = []
     for i in range(len(responses)):
@@ -371,5 +396,14 @@ def analyze_satisfaction(
         "details": {
             "likert_normalized": likert_norm,
             "categorical_scores": cat_scores
-        }
+        },
+        # Expose IKG (single source of truth) metadata so callers don't recompute IKG
+        "eti_scores": eti_scores,
+        "ikg_per_respondent_100": ikg_per_respondent_100,
+        "ikg_survey_index_100": ikg_survey_index_100,
+        "ikg_distribution": ikg_distribution,
+        "ikg_explainability": ikg_explainability,
+        "ikg_confidence_scores": ikg_confidence_scores,
+        "ikg_weight_metadata": ikg_weight_metadata,
+        "ikg_validation_metrics": ikg_validation_metrics,
     }
