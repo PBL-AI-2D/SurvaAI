@@ -10,26 +10,53 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { WeeklySatisfactionData } from "@/features/survey/utils/chart-data-processor";
+
+interface ETIIndicatorData {
+  period: string;
+  indicator: number; // -1 = turun, 0 = stabil, 1 = naik
+  eti: number;
+  trend: "naik" | "stabil" | "turun";
+}
 
 interface SatisfactionTrendChartProps {
-  data?: WeeklySatisfactionData[];
+  eti_scores?: number[];
+  trend_predictions?: ("naik" | "stabil" | "turun")[];
   isLoading?: boolean;
 }
 
-export function SatisfactionTrendChart({ data, isLoading }: SatisfactionTrendChartProps) {
-  const chartData = data || [
-    { week: "Period 1", satisfaction: 0 },
-    { week: "Period 2", satisfaction: 0 },
-  ];
-
+export function SatisfactionTrendChart({
+  eti_scores = [],
+  trend_predictions = [],
+  isLoading,
+}: SatisfactionTrendChartProps) {
   if (isLoading) {
     return (
       <div className="w-full h-full min-h-[400px] flex items-center justify-center">
-        <div className="text-sm text-muted-foreground">Loading chart data...</div>
+        <div className="text-sm text-muted-foreground">
+          Loading ETI indicator...
+        </div>
       </div>
     );
   }
+
+  const trendToIndicator: Record<string, number> = {
+    naik: 1,
+    stabil: 0,
+    turun: -1,
+  };
+
+  const chartData: ETIIndicatorData[] =
+    trend_predictions.length > 0
+      ? trend_predictions.map((trend, index) => ({
+          period: `Periode ${index + 1}`,
+          indicator: trendToIndicator[trend],
+          trend,
+          eti: eti_scores[index] ?? 0,
+        }))
+      : [
+          { period: "Periode 1", indicator: 0, eti: 0, trend: "stabil" },
+          { period: "Periode 2", indicator: 0, eti: 0, trend: "stabil" },
+        ];
 
   return (
     <div className="w-full h-full min-h-[400px]">
@@ -38,46 +65,46 @@ export function SatisfactionTrendChart({ data, isLoading }: SatisfactionTrendCha
           data={chartData}
           margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="#D1D5DB" opacity={0.6} />
+          <CartesianGrid strokeDasharray="3 3" opacity={0.6} />
           <XAxis
-            dataKey="week"
-            tick={{ fontSize: 12, fill: "#1F2937", fontWeight: 500 }}
-            axisLine={{ stroke: "#374151", strokeWidth: 1.5 }}
-            tickLine={{ stroke: "#374151" }}
-            label={{ value: "Time Period (Expected Trend Index)", position: "insideBottom", offset: -5, style: { fill: "#1F2937", fontWeight: 600, fontSize: 11 } }}
-          />
-          <YAxis
-            tick={{ fontSize: 12, fill: "#1F2937", fontWeight: 500 }}
-            axisLine={{ stroke: "#374151", strokeWidth: 1.5 }}
-            tickLine={{ stroke: "#374151" }}
-            domain={[0, 100]}
-            ticks={[0, 25, 50, 75, 100]}
-            label={{ value: "Satisfaction Index (%)", angle: -90, position: "insideLeft", style: { fill: "#1F2937", fontWeight: 600, fontSize: 11 } }}
-          />
-          <Tooltip
-            formatter={(value: number) => [`${value}%`, "Satisfaction"]}
-            labelStyle={{ color: "#374151", fontWeight: "500" }}
-            contentStyle={{
-              backgroundColor: "#fff",
-              border: "1px solid #E5E7EB",
-              borderRadius: "8px",
-              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+            dataKey="period"
+            tick={{ fontSize: 12 }}
+            label={{
+              value: "Time Period",
+              position: "insideBottom",
+              offset: -5,
             }}
           />
-          <Legend
-            verticalAlign="bottom"
-            height={36}
-            iconType="line"
-            wrapperStyle={{ fontSize: "12px", color: "#6B7280" }}
+          <YAxis
+            domain={[-1, 1]}
+            ticks={[-1, 0, 1]}
+            tickFormatter={(v) =>
+              v === 1 ? "Naik" : v === 0 ? "Stabil" : "Turun"
+            }
+            label={{
+              value: "ETI Indicator",
+              angle: -90,
+              position: "insideLeft",
+            }}
           />
+          <Tooltip
+            formatter={(value: number, _name, props) => {
+              const payload = props.payload as ETIIndicatorData;
+              return [
+                payload.trend.toUpperCase(),
+                `ETI: ${payload.eti.toFixed(2)}`,
+              ];
+            }}
+          />
+          <Legend />
           <Line
             type="monotone"
-            dataKey="satisfaction"
+            dataKey="indicator"
             stroke="var(--color-primary-1)"
             strokeWidth={3}
-            dot={{ fill: "var(--color-primary-1)", strokeWidth: 2, r: 4 }}
-            activeDot={{ r: 6, stroke: "var(--color-primary-1)", strokeWidth: 2 }}
-            name="Expected Trend Index"
+            dot={{ r: 5 }}
+            activeDot={{ r: 7 }}
+            name="ETI Trend Indicator"
           />
         </LineChart>
       </ResponsiveContainer>

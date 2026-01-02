@@ -448,7 +448,7 @@ def compute_combined_satisfaction_index(
             weights.append(adj_weight_preference)
             component_names.append("Preferensi")
 
-        # Weighted average IKG
+        # Weighted average IKG (initial baseline)
         if components and sum(weights) > 0:
             weighted_sum = sum(c * w for c, w in zip(components, weights))
             total_weight = sum(weights)
@@ -457,6 +457,63 @@ def compute_combined_satisfaction_index(
             # Fallback terakhir: jika benar‑benar tidak ada komponen eksplisit,
             # kembalikan 0.0 dan biarkan distribusi dianggap "Tidak Puas".
             ikg_value = 0.0
+
+        # --- Sensitivity adjustments ---
+        # Improve spread by applying small non-linear amplification and
+        # explicit boosts/penalties based on strong positive/negative signals.
+        # This makes IKG more responsive to dominant sentiment instead of
+        # clustering near neutral.
+
+        # 1) Determine strong sentiment signals
+        sentiment_strength = 0.0
+        try:
+            if sentiment_label == "positive":
+                sentiment_strength = 1.0
+            elif sentiment_label == "negative":
+                sentiment_strength = -1.0
+        except Exception:
+            sentiment_strength = 0.0
+
+        # 2) Likert-based strength (normalized -1..1)
+        likert_strength = 0.0
+        if likert_score_100 is not None:
+            # Center around 50: above 75 considered strongly positive, below 25 strongly negative
+            ls = (likert_score_100 - 50.0) / 50.0
+            likert_strength = max(-1.0, min(1.0, ls))
+
+        # 3) Preference signal (if available) - positive if >70, negative if <40
+        pref_strength = 0.0
+        if pref_score_100 is not None:
+            if pref_score_100 >= 70.0:
+                pref_strength = 0.6
+            elif pref_score_100 <= 40.0:
+                pref_strength = -0.6
+
+        # Combine strengths with simple weighting
+        combined_strength = (0.6 * sentiment_strength) + (0.3 * likert_strength) + (0.1 * pref_strength)
+
+        # 4) Non-linear amplification: amplify distance from neutral (50) by factor based on combined_strength
+        #    The factor is modest (0.0 - 0.6) to avoid overreaction but enough to create separation.
+        baseline_distance = (ikg_value - 50.0) / 50.0  # -1..1
+        sensitivity = 0.35  # base sensitivity
+        amp = 1.0 + (abs(combined_strength) * sensitivity)
+        amplified = 50.0 + (baseline_distance * 50.0 * amp)
+
+        # 5) Explicit boost/penalty for strong signals (helps push extreme consensus)
+        explicit_adjust = 0.0
+        # Boost when strongly positive consensus (sentiment positive or high likert)
+        if combined_strength >= 0.7:
+            explicit_adjust += 6.0 * min(1.0, combined_strength)
+        # Penalty when strongly negative consensus
+        if combined_strength <= -0.7:
+            explicit_adjust -= 8.0 * min(1.0, abs(combined_strength))
+
+        # 6) Confidence-aware dampening: if sentiment confidence is low, reduce explicit adjustments
+        if sentiment_confidence is not None and sentiment_confidence < 0.6:
+            explicit_adjust *= 0.5
+
+        # Compose final IKG value
+        ikg_value = float(amplified + explicit_adjust)
 
         # Clamp ke 0‑100
         ikg_value = float(max(0.0, min(100.0, ikg_value)))

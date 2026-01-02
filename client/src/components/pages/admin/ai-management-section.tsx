@@ -31,7 +31,7 @@ export function AIManagementSection() {
       </TabsContent>
 
       <TabsContent value="status" className="space-y-4">
-        {systemStatus?.data && (
+        {systemStatus && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="pb-2">
@@ -41,7 +41,7 @@ export function AIManagementSection() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {systemStatus.data.total_surveys}
+                  {systemStatus?.total_surveys}
                 </div>
               </CardContent>
             </Card>
@@ -54,7 +54,7 @@ export function AIManagementSection() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {systemStatus.data.total_analyses}
+                  {systemStatus?.total_analyses}
                 </div>
               </CardContent>
             </Card>
@@ -68,7 +68,7 @@ export function AIManagementSection() {
               <CardContent>
                 <div className="flex items-center gap-2">
                   <div className="text-2xl font-bold">
-                    {systemStatus.data.processing_analyses}
+                    {systemStatus?.processing_analyses}
                   </div>
                   <Badge className="bg-blue-500">
                     Active
@@ -86,9 +86,9 @@ export function AIManagementSection() {
               <CardContent>
                 <div className="flex items-center gap-2">
                   <div className="text-2xl font-bold">
-                    {systemStatus.data.error_analyses}
+                    {systemStatus?.error_analyses}
                   </div>
-                  {systemStatus.data.error_analyses > 0 && (
+                    {systemStatus?.error_analyses > 0 && (
                     <Badge variant="destructive">
                       Needs Attention
                     </Badge>
@@ -106,17 +106,17 @@ export function AIManagementSection() {
               <CardContent>
                 <Badge
                   variant={
-                    systemStatus.data.cache_status === "connected"
+                    systemStatus?.cache_status === "connected"
                       ? "default"
                       : "outline"
                   }
                 >
-                  {systemStatus.data.cache_status === "connected"
+                  {systemStatus?.cache_status === "connected"
                     ? "✅ Connected"
                     : "⚠️ Not Configured"}
                 </Badge>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Last updated: {new Date(systemStatus.data.timestamp).toLocaleString()}
+                  <p className="text-xs text-muted-foreground mt-2">
+                  Last updated: {new Date(systemStatus?.timestamp || Date.now()).toLocaleString()}
                 </p>
               </CardContent>
             </Card>

@@ -85,6 +85,10 @@ export const useSurveySatisfactionAnalysis = (
 
       // Transform Python service response to our format
       const pythonData = classificationResult.data;
+
+      // Debug: ensure backend IKG payload is logged for troubleshooting
+      // eslint-disable-next-line no-console
+      console.log("IKG API RESPONSE (satisfaction analysis)", pythonData);
       
       // Check if data is insufficient (minimum data check)
       if (pythonData.data_insufficient) {
@@ -117,7 +121,11 @@ export const useSurveySatisfactionAnalysis = (
       }
       
       // Safe access to sentiment_distribution with fallback
-      let sentimentDist = pythonData.satisfaction_overview?.sentiment_distribution;
+      // Accept either 'sentiment_distribution' (old frontend name)
+      // or backend-provided 'satisfaction_distribution'
+      let sentimentDist =
+        pythonData.satisfaction_overview?.sentiment_distribution ??
+        pythonData.satisfaction_overview?.satisfaction_distribution;
       
       if (!sentimentDist || (typeof sentimentDist !== 'object')) {
         const satisfactionPct = pythonData.ai_insight_summary?.satisfaction_percentage;
@@ -150,6 +158,13 @@ export const useSurveySatisfactionAnalysis = (
         negative: Number(sentimentDist.negative) || 0,
         neutral: Number(sentimentDist.neutral) || 0,
       };
+
+      // Expose raw backend distribution directly so IKG distribution charts
+      // can consume the backend-provided values without recomputation.
+      const satisfaction_distribution_raw =
+        pythonData.satisfaction_overview?.satisfaction_distribution ??
+        pythonData.satisfaction_overview?.sentiment_distribution ??
+        undefined;
       
       return {
         total_respondents: pythonData.satisfaction_overview?.total_respondents || pythonData.analytics_overview?.total_respondents || 0,
@@ -217,7 +232,8 @@ export const useSurveySatisfactionAnalysis = (
           ? pythonData.ikg_explainability.map((exp: any) => ({
               respondent_index: Number(exp.respondent_index || 0),
               ikg_value: Number(exp.ikg_value || 0),
-              label: (exp.label || "Netral") as "Puas" | "Netral" | "Tidak Puas",
+              // Preserve backend-provided label; do not default to "Netral" here
+              label: exp.label ? (exp.label as "Puas" | "Netral" | "Tidak Puas") : undefined,
               components_used: Array.isArray(exp.components_used) ? exp.components_used.map(String) : [],
               component_scores: {
                 likert: typeof exp.component_scores?.likert === "number" ? exp.component_scores.likert : undefined,
@@ -282,6 +298,16 @@ export const useSurveySatisfactionAnalysis = (
           netral: Number(pythonData.distribution_combined_satisfaction.netral || 0),
           tidak_puas: Number(pythonData.distribution_combined_satisfaction.tidak_puas || 0),
         } : undefined,
+        // Expose raw per-respondent IKG (0-100) if backend provides it under known keys
+        ikg_raw_scores: Array.isArray(pythonData.ikg_per_respondent_100)
+          ? pythonData.ikg_per_respondent_100.map((s: any, idx: number) => ({ index: idx + 1, score: Number(s || 0) }))
+          : Array.isArray(pythonData.per_respondent)
+            ? pythonData.per_respondent.map((s: any, idx: number) => ({ index: idx + 1, score: Number(s || 0) }))
+            : Array.isArray(pythonData.ikg_per_respondent)
+              ? pythonData.ikg_per_respondent.map((s: any, idx: number) => ({ index: idx + 1, score: Number(s || 0) }))
+              : undefined,
+        // Provide raw distribution from backend for charts that need direct values
+        satisfaction_distribution_raw: satisfaction_distribution_raw,
       };
     },
     enabled: enabled && !!surveyId,

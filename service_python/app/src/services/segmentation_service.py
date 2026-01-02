@@ -13,10 +13,15 @@ def _build_feature_matrix(
     product_features: List[Dict[str, int]], # Input: One-Hot (Produk A=1, Produk B=0, dst)
 ) -> Tuple[pd.DataFrame, np.ndarray, List[str]]:
     
-    # Base: Kepuasan & Sentimen
+    # Calculate IKG deviation to ensure high-variance features for segmentation
+    mean_ikg = np.mean(satisfaction_scores) if satisfaction_scores else 0.5
+    ikg_deviation = [s - mean_ikg for s in satisfaction_scores]
+
+    # Base: Kepuasan, Sentimen, and High-Variance Feature (IKG Deviation)
     base_df = pd.DataFrame({
         "satisfaction": satisfaction_scores,
         "sentiment": sentiment_scores,
+        "ikg_deviation": ikg_deviation,
     })
     
     # Fitur Produk/Preferensi (Wajib One-Hot Encoding: 0 atau 1)
@@ -125,9 +130,10 @@ def segment_respondents(
 ) -> Dict[str, Any]:
     """
     Segmentasi responden (AI-2).
+    HANYA MENGGUNAKAN IKG (0-1) sebagai input satisfaction_scores.
 
     - Input fitur SELALU per responden (n_responden x n_fitur):
-      * satisfaction_scores[i]  -> skor kepuasan responden ke-i (0-1)
+      * satisfaction_scores[i]  -> HARUS IKG per responden (dinormalisasi 0-1)
       * sentiment_scores[i]     -> skor sentimen responden ke-i (0-1)
       * product_features[i][*]  -> fitur kategorikal one‑hot responden ke-i (0/1)
 
@@ -138,7 +144,24 @@ def segment_respondents(
     """
     
     # 1. Build Data
-    df_features, X, product_cols = _build_feature_matrix(satisfaction_scores, sentiment_scores, product_features)
+    # Ensure satisfaction_scores are normalized to 0-1 internally.
+    # Accept either IKG in 0-1 or 0-100 (common source); if values appear >1.5,
+    # we assume 0-100 scale and normalize by dividing by 100.
+    norm_satisfaction_scores = []
+    for s in satisfaction_scores:
+        try:
+            if s is None:
+                norm_satisfaction_scores.append(0.0)
+            else:
+                val = float(s)
+                if val > 1.5:
+                    norm_satisfaction_scores.append(val / 100.0)
+                else:
+                    norm_satisfaction_scores.append(val)
+        except Exception:
+            norm_satisfaction_scores.append(0.0)
+
+    df_features, X, product_cols = _build_feature_matrix(norm_satisfaction_scores, sentiment_scores, product_features)
     
     # 2. Scaling (Agar Sentimen & Fitur Produk bobotnya seimbang)
     scaler = StandardScaler()

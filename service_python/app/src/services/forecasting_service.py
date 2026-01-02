@@ -12,24 +12,38 @@ def forecast_eti_trend(
     weights: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
     """
-    Forecast ETI trend berdasarkan data saat ini dan history (jika ada).
+    Forecast terhadap nilai IKG (Indeks Kepuasan Gabungan).
+    Melakukan prediksi trend ke depan berbasis IKG sebagai single source of truth.
     
     Args:
-        sentiment_scores: Skor sentimen saat ini per responden (0-1)
-        satisfaction_scores: Skor kepuasan saat ini per responden (0-1)
-        satisfaction_history: Riwayat skor kepuasan per responden (optional)
-        historical_preferences: Riwayat preferensi per responden (optional)
-        current_preferences: Preferensi saat ini per responden (optional)
-        weights: Bobot untuk ETI calculation
-    
-    Returns:
-        Dictionary dengan hasil forecasting
+        sentiment_scores: [Legacy] Tidak lagi digunakan secara langsung.
+        satisfaction_scores: [Single Source of Truth] List IKG per responden (0-1).
+        satisfaction_history: [Legacy/Optional] Riwayat IKG jika tersedia.
+        historical_preferences: Riwayat preferensi per responden (optional).
+        current_preferences: Preferensi saat ini per responden (optional).
+        weights: [Legacy] Tidak lagi digunakan secara langsung.
     """
-    # 1. Calculate ETI scores
+    # Normalize incoming satisfaction_scores to 0-1 if provided in 0-100 scale.
+    norm_satisfaction = []
+    for v in satisfaction_scores:
+        try:
+            if v is None:
+                norm_satisfaction.append(0.0)
+            else:
+                fv = float(v)
+                norm_satisfaction.append(fv / 100.0 if fv > 1.5 else fv)
+        except Exception:
+            norm_satisfaction.append(0.0)
+
+    # 1. Calculate ETI scores berbasis IKG
+    # Pass sentiment_confidence if available in some context, for now we pass None 
+    # and let calculate_eti_score use default if not provided in args.
+    # To improve this, we should ideally get sentiment_confidence from somewhere.
     eti_scores = calculate_eti_score(
         sentiment_scores=sentiment_scores,
-        satisfaction_scores=satisfaction_scores,
+        satisfaction_scores=norm_satisfaction,
         weights=weights,
+        sentiment_confidence=None # Adjust if confidence is available in args
     )
     
     # 2. Predict trends from ETI
@@ -69,14 +83,16 @@ def forecast_eti_trend(
         predicted_satisfaction = []
         regression_trends = []
         for i, (current_sat, trend) in enumerate(zip(satisfaction_scores, trend_predictions)):
+            # Use normalized current_sat (we normalized earlier to norm_satisfaction)
+            current_val = norm_satisfaction[i] if i < len(norm_satisfaction) else (float(current_sat) if current_sat is not None else 0.0)
             if trend == "naik":
-                predicted_sat = min(1.0, current_sat + 0.05)
+                predicted_sat = min(1.0, current_val + 0.05)
                 regression_trends.append("increasing")
             elif trend == "turun":
-                predicted_sat = max(0.0, current_sat - 0.05)
+                predicted_sat = max(0.0, current_val - 0.05)
                 regression_trends.append("decreasing")
             else:
-                predicted_sat = current_sat
+                predicted_sat = current_val
                 regression_trends.append("stable")
             predicted_satisfaction.append(float(predicted_sat))
     
@@ -119,4 +135,3 @@ def forecast_eti_trend(
         "preference_consistency": preference_consistency,
         "extreme_deviation": extreme_deviation,
     }
-
