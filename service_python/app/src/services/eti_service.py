@@ -129,7 +129,3 @@ def calculate_trend_from_satisfaction(
     if slope < -0.01:
         return "negative"
     return "stable"
-
-# --- Fungsi History Dihapus ---
-# calculate_preference_consistency & calculate_extreme_deviation 
-# DIHAPUS karena tidak relevan untuk survei single-batch yang independen.

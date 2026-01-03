@@ -9,102 +9,97 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  ReferenceLine,
 } from "recharts";
 
 interface ETIIndicatorData {
   period: string;
-  indicator: number; // -1 = turun, 0 = stabil, 1 = naik
   eti: number;
   trend: "naik" | "stabil" | "turun";
+  indicator: 1 | 0 | -1;
 }
 
-interface SatisfactionTrendChartProps {
-  eti_scores?: number[];
-  trend_predictions?: ("naik" | "stabil" | "turun")[];
+interface ETIIndicatorChartProps {
+  data?: ETIIndicatorData[];
   isLoading?: boolean;
 }
 
 export function SatisfactionTrendChart({
-  eti_scores = [],
-  trend_predictions = [],
+  data,
   isLoading,
-}: SatisfactionTrendChartProps) {
+}: ETIIndicatorChartProps) {
+  const chartData = data ?? [];
+
   if (isLoading) {
     return (
       <div className="w-full h-full min-h-[400px] flex items-center justify-center">
-        <div className="text-sm text-muted-foreground">
+        <span className="text-sm text-muted-foreground">
           Loading ETI indicator...
-        </div>
+        </span>
       </div>
     );
   }
 
-  const trendToIndicator: Record<string, number> = {
-    naik: 1,
-    stabil: 0,
-    turun: -1,
-  };
-
-  const chartData: ETIIndicatorData[] =
-    trend_predictions.length > 0
-      ? trend_predictions.map((trend, index) => ({
-          period: `Periode ${index + 1}`,
-          indicator: trendToIndicator[trend],
-          trend,
-          eti: eti_scores[index] ?? 0,
-        }))
-      : [
-          { period: "Periode 1", indicator: 0, eti: 0, trend: "stabil" },
-          { period: "Periode 2", indicator: 0, eti: 0, trend: "stabil" },
-        ];
+  if (chartData.length === 0) {
+    return (
+      <div className="w-full h-full min-h-[400px] flex items-center justify-center">
+        <span className="text-sm text-muted-foreground">
+          No ETI data available
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full min-h-[400px]">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart
-          data={chartData}
-          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" opacity={0.6} />
+        <LineChart data={chartData} margin={{ top: 20, right: 30 }}>
+          <CartesianGrid strokeDasharray="3 3" opacity={0.4} />
+
           <XAxis
             dataKey="period"
             tick={{ fontSize: 12 }}
             label={{
-              value: "Time Period",
+              value: "Periode Waktu",
               position: "insideBottom",
               offset: -5,
+              fontSize: 11,
             }}
           />
+
           <YAxis
-            domain={[-1, 1]}
-            ticks={[-1, 0, 1]}
-            tickFormatter={(v) =>
-              v === 1 ? "Naik" : v === 0 ? "Stabil" : "Turun"
-            }
+            domain={[0, 1]}
+            ticks={[0, 0.5, 0.7, 1]}
+            tickFormatter={(v) => v.toFixed(1)}
             label={{
-              value: "ETI Indicator",
+              value: "Expected Trend Indicator (ETI)",
               angle: -90,
               position: "insideLeft",
+              fontSize: 11,
             }}
           />
+
+          {/* Threshold */}
+          <ReferenceLine y={0.7} stroke="#22c55e" strokeDasharray="4 4" />
+          <ReferenceLine y={0.5} stroke="#facc15" strokeDasharray="4 4" />
+
           <Tooltip
-            formatter={(value: number, _name, props) => {
-              const payload = props.payload as ETIIndicatorData;
-              return [
-                payload.trend.toUpperCase(),
-                `ETI: ${payload.eti.toFixed(2)}`,
-              ];
-            }}
+            formatter={(value: number, _, payload) => [
+              value.toFixed(3),
+              `ETI (${payload?.payload?.trend})`,
+            ]}
           />
+
           <Legend />
+
           <Line
             type="monotone"
-            dataKey="indicator"
+            dataKey="eti"
             stroke="var(--color-primary-1)"
             strokeWidth={3}
-            dot={{ r: 5 }}
-            activeDot={{ r: 7 }}
-            name="ETI Trend Indicator"
+            dot={{ r: 4 }}
+            activeDot={{ r: 6 }}
+            name="Expected Trend Indicator"
           />
         </LineChart>
       </ResponsiveContainer>
