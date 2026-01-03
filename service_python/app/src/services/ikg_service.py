@@ -65,22 +65,7 @@ def _extract_numeric_from_likert(value: Any) -> Optional[float]:
 
 
 def map_sentiment_label_to_score(label: Optional[str]) -> Optional[float]:
-    """
-    Mapping label sentimen NLP ke skor kepuasan 0‑100.
 
-    Sumber skor:
-    - positive  -> 85
-    - neutral   -> 70
-    - negative  -> 50
-
-    Alasan mapping:
-    - Positif diberi skor tinggi namun tidak 100 agar masih bisa
-      "dikoreksi" oleh komponen lain (Likert / pilihan).
-    - Netral di tengah (70) agar tidak terlalu menurunkan skor jika
-      responden tidak banyak menulis opini.
-    - Negatif tidak dibuat terlalu rendah (50) supaya masih bisa
-      tertolong jika Likert menunjukkan kepuasan yang baik.
-    """
     if not label:
         return None
 
@@ -170,9 +155,10 @@ def calculate_dynamic_weights(
             numeric_vals = []
             for k, v in likert_raw.items():
                 try:
-                    val = float(v)
-                    numeric_vals.append(val)
-                except (TypeError, ValueError):
+                    val = _extract_numeric_from_likert(v)
+                    if val is not None:
+                        numeric_vals.append(val)
+                except:
                     continue
             if numeric_vals:
                 likert_count += 1

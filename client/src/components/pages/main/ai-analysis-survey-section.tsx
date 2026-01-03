@@ -176,7 +176,7 @@ export function AIAnalysisSurveySection({
 
         <div className="bg-background rounded-lg p-5 shadow-sm border border-border flex flex-col">
           <h4 className="text-sm font-semibold text-foreground mb-4">
-            Top 8 preferensi responden (berdasarkan frekuensi jawaban)
+            Preference Overview
           </h4>
           <div className="flex-1 min-h-[400px]">
             <PreferencesChart
@@ -192,10 +192,9 @@ export function AIAnalysisSurveySection({
           </h4>
           <div className="flex-1 min-h-[400px]">
             <SatisfactionTrendChart
-              eti_scores={satisfactionTrendData?.eti_scores || []}
-              trend_predictions={satisfactionTrendData?.trend_predictions || []}
-              isLoading={isLoading}
-            />
+                data={satisfactionTrendData || []}
+                isLoading={isLoading}
+              />
           </div>
         </div>
       </div>
