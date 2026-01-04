@@ -46,17 +46,17 @@ export function ClassificationChart({
   }
 
   const data = [
-    { label: "Puas (IKG ≥ 70)", value: satisfactionPercentage.satisfied, fill: "#66BB6A" },
-    { label: "Netral (40 ≤ IKG < 70)", value: satisfactionPercentage.neutral, fill: "#B0BEC5" },
-    { label: "Tidak Puas (IKG < 40)", value: satisfactionPercentage.unsatisfied, fill: "#EF5350" },
+    { label: "Satisfied", value: satisfactionPercentage.satisfied, fill: "#66BB6A" },
+    { label: "Neutral", value: satisfactionPercentage.neutral, fill: "#B0BEC5" },
+    { label: "Dissatisfied", value: satisfactionPercentage.unsatisfied, fill: "#EF5350" },
   ];
 
   return (
     <div className="w-full h-full min-h-[400px]">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data}>
+        <BarChart data={data} margin={{ bottom: 24 }}>
           <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="label" />
+          <XAxis dataKey="label" interval={0} tick={{ dy: 8 }} />
           <YAxis domain={[0, 100]} />
           <Tooltip formatter={(v: number) => `${v.toFixed(1)}%`} />
           <Bar dataKey="value" radius={[6, 6, 0, 0]} />
