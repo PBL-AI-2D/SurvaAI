@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+import { calculateEtiScores, predictTrendFromEti } from "@/features/survey/utils/chart-data-processor";
 import {
   LineChart,
   Line,
@@ -59,12 +61,6 @@ export function SatisfactionTrendChart({
           <XAxis
             dataKey="period"
             tick={{ fontSize: 12 }}
-            label={{
-              value: "Periode Waktu",
-              position: "insideBottom",
-              offset: -5,
-              fontSize: 11,
-            }}
           />
 
           <YAxis
@@ -72,16 +68,15 @@ export function SatisfactionTrendChart({
             ticks={[0, 0.5, 0.7, 1]}
             tickFormatter={(v) => v.toFixed(1)}
             label={{
-              value: "Expected Trend Indicator (ETI)",
               angle: -90,
               position: "insideLeft",
               fontSize: 11,
             }}
           />
 
-          {/* Threshold */}
-          <ReferenceLine y={0.7} stroke="#22c55e" strokeDasharray="4 4" />
-          <ReferenceLine y={0.5} stroke="#facc15" strokeDasharray="4 4" />
+          {/* Threshold — use theme colors and dashed style */}
+          <ReferenceLine y={0.7} stroke="var(--color-primary-1)" />
+          <ReferenceLine y={0.5} stroke="var(--color-primary-2)"/>
 
           <Tooltip
             formatter={(value: number, _, payload) => [

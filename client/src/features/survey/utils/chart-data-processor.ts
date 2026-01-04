@@ -56,6 +56,53 @@ export interface WeeklySatisfactionData {
  * Process satisfaction scores menjadi weekly trend
  * Jika data kurang dari 4 minggu, buat grouping berdasarkan waktu
  */
+
+export type Trend = "naik" | "stabil" | "turun";
+
+// Calculate ETI scores from satisfaction values (expects 0..1 values or 0..100)
+export function calculateEtiScores(satisfactionScores: number[]): number[] {
+  const norm = satisfactionScores.map((v) => {
+    if (v === null || typeof v === "undefined") return 0;
+    const fv = Number(v);
+    return fv > 1.5 ? fv / 100.0 : fv;
+  });
+
+  if (norm.length === 0) return [];
+
+  const mean = norm.reduce((s, x) => s + x, 0) / norm.length;
+
+  return norm.map((ikg) => {
+    const deviation = ikg - mean;
+    const conf = 0.5; // client-side fallback
+    const eti_base = 0.5 + deviation * (0.5 + conf);
+    return Math.min(1, Math.max(0, eti_base));
+  });
+}
+
+export function predictTrendFromEti(etiScores: number[]): { trends: Trend[]; percents: number[] } {
+  const trends: Trend[] = [];
+  const percents: number[] = [];
+
+  etiScores.forEach((eti) => {
+    if (eti > 0.7) {
+      trends.push("naik");
+      const pct = ((eti - 0.7) / 0.3) * 10;
+      percents.push(Number(pct.toFixed(2)));
+    } else if (eti < 0.5) {
+      trends.push("turun");
+      const pct = -((0.5 - eti) / 0.5) * 10;
+      percents.push(Number(pct.toFixed(2)));
+    } else {
+      trends.push("stabil");
+      percents.push(0);
+    }
+  });
+
+  return { trends, percents };
+}
+
+
+
 export function processSatisfactionTrend(
   responses: ResponSurvei[],
   satisfactionData?: AIClassificationData
